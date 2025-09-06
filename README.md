@@ -148,6 +148,10 @@ uvx pre-commit run -a
   * `uvx pre-commit run -a` … すべてのフック（Python: ruff/black/isort、TS: Biome、共通: end-of-file/trailing-whitespace 等）を実行
   * CI でも同一コマンドを実行（`.github/workflows/ci.yml`）
 
+## Credits
+- Weather data powered by **Open-Meteo** (https://open-meteo.com/).
+  本アプリは Open-Meteo の無償APIを利用しています（非商用MVP用途）。
+
 ## 📚 用語定義（Glossary）
 
 * **MVP**: 最小実用製品。今回は「翌日の気温/降水を返す」まで
