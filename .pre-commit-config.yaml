@@ -1,0 +1,48 @@
+repos:
+  # 基本整形
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-yaml
+      - id: check-json
+
+  # Python: ruff (lint + fix)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        name: ruff (lint)
+        args: [--fix]
+        types_or: [python]
+      - id: ruff-format
+        name: ruff (format)
+        types_or: [python]
+
+  # Python: black（最終フォーマッタ）
+  - repo: https://github.com/psf/black
+    rev: 24.8.0
+    hooks:
+      - id: black
+        language_version: python3
+        files: ^backend/.*\.py$
+
+  # Python: isort（import 並べ替え）
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: [--profile=black]
+        files: ^backend/.*\.py$
+
+  # TS/JS/JSON: Biome（lint + format）
+  - repo: local
+    hooks:
+      - id: biome-check
+        name: biome check (format+lint)
+        entry: bash -lc 'cd frontend && pnpm biome check --write'
+        language: system
+        pass_filenames: false
+        files: ^frontend/(app|components|lib|pages|src)/.*\.(ts|tsx|js|jsx|json|jsonc)$
+        exclude: ^frontend/(node_modules|\.next|dist|build|coverage|\.turbo)/

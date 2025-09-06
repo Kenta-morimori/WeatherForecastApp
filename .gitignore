@@ -1,18 +1,41 @@
-# Node
+# macOS
+.DS_Store
+
+# Editor / IDE
+.vscode/
+.idea/
+
+# Python (backend/)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.python-version
+.venv/
+.uv/
+.cache/
+dist/
+build/
+
+# Node (frontend/)
 node_modules/
 .next/
 out/
+pnpm-lock.yaml # ← コミットしたい場合は削除
+.next/cache/
+coverage/
+
+# Logs
 *.log
-.env*
-# Python
-__pycache__/
-*.pyc
-.venv/
-venv/
-# macOS
-.DS_Store
-# Misc
-.idea/
-.vscode/*
-!.vscode/settings.json
-!.vscode/extensions.json
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Env
+.env
+.env.*
+!.env.example
+frontend/.env.local
+backend/.env
