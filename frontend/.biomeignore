@@ -1,0 +1,10 @@
+# build / cache
+.next/
+node_modules/
+dist/
+build/
+.turbo/
+coverage/
+
+# その他生成物
+**/*.map
