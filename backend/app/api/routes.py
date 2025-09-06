@@ -14,9 +14,11 @@ class PredictRequest(BaseModel):
     target_date: date = Field(..., description="Prediction target date (YYYY-MM-DD)")
     name: Optional[str] = Field(None, description="Optional location name label")
 
+
 class Location(BaseModel):
     lat: float
     lon: float
+
 
 class Prediction(BaseModel):
     temp_mean_c: float
@@ -24,9 +26,11 @@ class Prediction(BaseModel):
     temp_max_c: float
     precip_mm: float
 
+
 class Explanation(BaseModel):
     features_used: list[str]
     notes: str
+
 
 class PredictResponse(BaseModel):
     location: Location
