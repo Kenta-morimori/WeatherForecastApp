@@ -164,6 +164,84 @@ uvx pre-commit run -a
 * Frontend: `pnpm -C frontend test`（Vitest など） / `pnpm -C frontend lint`（必要に応じて）
 * Backend: `uvx pytest` / `uvx ruff check backend`（`--fix` で自動修正）
 
+## 🔧 Backend: 学習→保存→推論（最短手順）
+
+### 1) 学習（GBDT + 残差学習）
+```bash
+# リポジトリ直下
+uv run --project backend python -m app.ml.train --seed 42 --n-days 720 --splits 5 --residual
+# => models/YYYYMMDD_<gitSHA>_gbdt.joblib が保存される
+```
+
+### 2) モデル切替（推論で使用）
+
+- `backend/.env.example` を参考に `.env` を設定（開発時は export でもOK）
+- 例：backend 直下で起動する場合
+
+```bash
+cd backend
+export MODEL_BACKEND=regression
+export MODEL_PATH=./models/<YYYYMMDD>_<gitSHA>_gbdt.joblib
+uv run uvicorn app.main:app --reload --port 8000
+```
+
+運用のコツ：最新モデルにシンボリックリンクを張る
+
+```bash
+# リポジトリ直下
+ln -sfn "$(ls models/*_gbdt.joblib | tail -n1)" models/latest_gbdt.joblib
+# 起動時は MODEL_PATH=./models/latest_gbdt.joblib で固定
+```
+
+### 3) 疎通
+
+```bash
+curl -s -X POST 'http://127.0.0.1:8000/predict' \
+  -H 'Content-Type: application/json' \
+  -d '{"lat":35.6762,"lon":139.6503}' | jq
+```
+
+## 🧪 CI（GitHub Actions）
+
+- CIは以下を実行
+  - pre-commit（ruff/black/isort/Biome）
+  - Frontend build（pnpm）
+  - Backend pytest（ユニット + E2Eモック）
+- 参考: .github/workflows/ci.yml
+
+🌐 環境変数（Backend 抜粋）
+
+- `MODEL_BACKEND`: `persistence` | `regression`（既定: `persistence`）
+- `MODEL_PATH`: 学習成果物の `.joblib`（`regression` 時のみ必須）
+- `OPEN_METEO_*`: Open-Meteo クライアント設定
+- `ALLOW_ORIGINS`: CORS 設定（開発では `http://localhost:3000`）
+
+# 実行手順（コピペ用）
+
+```bash
+# 1) 依存
+pnpm -C frontend install
+uv sync --project backend
+
+# 2) 学習
+uv run --project backend python -m app.ml.train --seed 42 --n-days 720 --splits 5 --residual
+
+# 3) モデル切替でAPI起動（backend直下）
+cd backend
+export MODEL_BACKEND=regression
+export MODEL_PATH=./models/$(ls ../models/*_gbdt.joblib | xargs -n1 basename | tail -n1)  # 直近を指す例
+uv run uvicorn app.main:app --reload --port 8000
+
+# 4) 疎通
+curl -s -X POST 'http://127.0.0.1:8000/predict' \
+  -H 'Content-Type: application/json' \
+  -d '{"lat":35.6762,"lon":139.6503}' | jq
+
+# 5) テスト（任意）
+cd ..
+uv run --project backend pytest -q
+```
+
 ## 📈 将来ロードマップ
 
 * [ ] モデル高度化（時系列外生変数、アンサンブル、地域別バリアント）

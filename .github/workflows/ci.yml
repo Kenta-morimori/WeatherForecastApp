@@ -1,39 +1,46 @@
-name: CI
-
-on:
-  push:
-    branches: [ main, develop, feature/** ]
-  pull_request:
-
 jobs:
-  lint-format:
+  build-and-test:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node (pnpm)
+      # ---- Node / Frontend ----
+      - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 9
+          run_install: false   # install は後で pnpm -C frontend install を明示的にやる
 
-      - name: Setup Python (uv)
-        uses: astral-sh/setup-uv@v3
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          enable-cache: true
+          node-version: '20'
+          cache: 'pnpm'
 
-      - name: Install frontend dev deps
-        working-directory: frontend
-        run: pnpm install
-
-      - name: Pre-commit (same command as local)
-        run: uvx pre-commit run -a
+      - name: Frontend install
+        run: pnpm -C frontend install --frozen-lockfile
 
       - name: Frontend build
-        working-directory: frontend
-        run: pnpm build
+        run: pnpm -C frontend build
 
-      - name: Backend tests
-        working-directory: backend
-        run: uv run pytest -q
+      # ---- Python / Backend ----
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        run: pipx install uv
+
+      - name: Backend deps sync
+        run: uv sync --project backend --frozen
+
+      - name: Run pre-commit (lint/format)
+        run: uvx pre-commit run -a
+
+      - name: Run backend tests (unit + e2e)
+        env:
+          MODEL_BACKEND: persistence
+        run: uv run --project backend pytest -q

@@ -8,9 +8,10 @@ import pandas as pd
 
 
 class SimpleRegModel:
-    """回帰モデルのラッパ（旧形式・新形式を吸収）
-    - 旧: 直接 sklearn モデル
-    - 新: {"pipeline": FeaturePipeline, "model": sklearn}
+    """回帰モデルのラッパ
+    - 新: {"pipeline": FeaturePipeline, "model": sklearn, "metadata": {...}}
+      * metadata.residual=True の場合は d0 を加算して元のスケールへ戻す
+    - 旧: 直接 sklearn モデル（d0_* をそのまま予測に）
     """
 
     def __init__(self, model: Any):
@@ -18,22 +19,30 @@ class SimpleRegModel:
 
     @classmethod
     def load(cls, path: str) -> "SimpleRegModel":
-        obj = joblib.load(path)
-        return cls(model=obj)
+        return cls(model=joblib.load(path))
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
-        # 新形式（辞書形式）
+        # 新形式（辞書）
         if isinstance(self.model, dict) and "model" in self.model:
-            pipe = self.model.get("pipeline", None)
+            pipe = self.model.get("pipeline")
             reg = self.model["model"]
+            meta = self.model.get("metadata", {}) or {}
+            residual = bool(meta.get("residual", False))
+
             if pipe is not None:
                 X = pipe.transform(df)
             else:
-                # パイプラインが無い場合の後方互換
                 X = df[["d0_mean", "d0_min", "d0_max", "d0_prec"]]
-            y = reg.predict(X)
-            return np.asarray(y)
 
-        # 旧形式（d0_* を直接入れる）
+            y_hat = reg.predict(X)
+
+            if residual:
+                # df は D0 の日次。d0 を加算して元スケールへ戻す
+                d0 = df[["d_mean", "d_min", "d_max", "d_prec"]].to_numpy()
+                y_hat = y_hat + d0
+
+            return np.asarray(y_hat)
+
+        # 旧形式
         X = df[["d0_mean", "d0_min", "d0_max", "d0_prec"]]
         return np.asarray(self.model.predict(X))
