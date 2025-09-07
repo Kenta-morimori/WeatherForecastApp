@@ -1,36 +1,66 @@
-# backend/app/scripts/train_dummy_regression.py
 from __future__ import annotations
 
+from datetime import datetime, timedelta
 from pathlib import Path
 
+import joblib
 import numpy as np
+import pandas as pd
+from sklearn.linear_model import LinearRegression
 
-from app.ml.baseline import SimpleRegModel, set_seed
+from app.ml.features import FeaturePipeline, FeaturePipelineConfig
 
 
-def main():
-    rng = set_seed(42)
-    n = 200
-    d0_mean = rng.normal(20, 5, n)
-    d0_min = d0_mean - rng.normal(2, 1, n)
-    d0_max = d0_mean + rng.normal(3, 1, n)
-    d0_prec = np.clip(rng.exponential(1.0, n), 0, 20)
+def main(seed: int = 42, n_days: int = 240) -> None:
+    rng = np.random.default_rng(seed)
 
-    d1_mean = d0_mean + rng.normal(0, 0.3, n)
-    d1_min = d0_min + rng.normal(0, 0.3, n)
-    d1_max = d0_max + rng.normal(0, 0.3, n)
-    d1_prec = np.clip(d0_prec + rng.normal(0, 0.3, n), 0, None)
+    # ==== 合成日次データ ====
+    start = datetime(2024, 1, 1)
+    dates = [start + timedelta(days=i) for i in range(n_days)]
+    t = np.arange(n_days)
 
-    df = SimpleRegModel.build_training_frame(
-        zip(d0_mean, d0_min, d0_max, d0_prec, d1_mean, d1_min, d1_max, d1_prec)
+    base = 20 + 10 * np.sin(2 * np.pi * t / 365.25)  # 年周
+    noise = rng.normal(0, 2, size=n_days)
+
+    d_mean = base + noise
+    d_min = d_mean - rng.uniform(1, 5, size=n_days)
+    d_max = d_mean + rng.uniform(1, 5, size=n_days)
+    d_prec = rng.gamma(shape=1.2, scale=1.0, size=n_days) * (rng.random(n_days) < 0.4)
+
+    df = pd.DataFrame(
+        {
+            "date": pd.to_datetime(dates),
+            "d_mean": d_mean,
+            "d_min": d_min,
+            "d_max": d_max,
+            "d_prec": d_prec,
+        }
     )
-    model = SimpleRegModel.train(df, random_state=42)
 
-    # backend/app/model/model.joblib に保存（スクリプト位置起点）
-    model_path = Path(__file__).resolve().parents[1] / "model" / "model.joblib"
-    model_path.parent.mkdir(parents=True, exist_ok=True)
-    model.save(str(model_path))
-    print(f"saved: {model_path}")
+    # 教師信号（翌日）
+    y = df[["d_mean", "d_min", "d_max", "d_prec"]].shift(-1)
+    y.columns = ["d1_mean", "d1_min", "d1_max", "d1_prec"]
+
+    # 最終行はターゲットがないので除外
+    df = df.iloc[:-1].reset_index(drop=True)
+    y = y.iloc[:-1].reset_index(drop=True)
+
+    # ==== 特徴量パイプライン ====
+    pipe = FeaturePipeline(FeaturePipelineConfig())
+    X = pipe.fit(df).transform(df)
+
+    # ==== ダミー回帰 ====
+    model = LinearRegression().fit(X, y)
+
+    # ==== 保存（ファイル位置基準で固定）====
+    # このスクリプトは backend/app/scripts/ 配下 → 親(1)=app, 親(2)=backend
+    script_path = Path(__file__).resolve()
+    app_dir = script_path.parents[1]  # .../backend/app
+    save_path = app_dir / "model" / "model.joblib"
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+
+    joblib.dump({"pipeline": pipe, "model": model, "version": 1}, save_path.as_posix())
+    print(f"saved to {save_path.as_posix()}")
 
 
 if __name__ == "__main__":

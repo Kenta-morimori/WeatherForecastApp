@@ -1,77 +1,113 @@
-import os
-from datetime import date
-from typing import Optional
+from __future__ import annotations
 
-from fastapi import APIRouter
+import os
+from datetime import date as _date
+from datetime import datetime
+from typing import Dict
+from zoneinfo import ZoneInfo
+
+import pandas as pd
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from app.ml.baseline import predict_with_backend
+from app.ml.baseline import SimpleRegModel
+from app.services.feature_builder import D0Features, build_d0_features_via_client
+from app.services.open_meteo import OpenMeteoClient
 
 router = APIRouter()
 
 
-# === Pydantic Schemas ===
-class PredictRequest(BaseModel):
-    lat: float = Field(..., description="Latitude", examples=[35.681236])
-    lon: float = Field(..., description="Longitude", examples=[139.767125])
-    target_date: date = Field(..., description="Prediction target date (YYYY-MM-DD)")
-    name: Optional[str] = Field(None, description="Optional location name label")
+class Health(BaseModel):
+    status: str = "ok"
 
 
-class Location(BaseModel):
-    lat: float
-    lon: float
+class PredictIn(BaseModel):
+    lat: float = Field(ge=-90, le=90)
+    lon: float = Field(ge=-180, le=180)
+    date: _date | None = None  # 省略時は Asia/Tokyo の「今日」を D0 とする
 
 
-class Prediction(BaseModel):
-    temp_mean_c: float
-    temp_min_c: float
-    temp_max_c: float
-    precip_mm: float
+class PredictOut(BaseModel):
+    backend: str
+    date_d0: _date
+    date_d1: _date
+    features: D0Features
+    prediction: Dict[str, float]
 
 
-class Explanation(BaseModel):
-    features_used: list[str]
-    notes: str
+@router.get("/health", response_model=Health)
+def health() -> Health:
+    return Health()
 
 
-class PredictResponse(BaseModel):
-    location: Location
-    target_date: date
-    prediction: Prediction
-    explanation: Explanation
+@router.post("/predict", response_model=PredictOut)
+def predict(inp: PredictIn) -> PredictOut:
+    tz = ZoneInfo("Asia/Tokyo")
+    today = datetime.now(tz=tz).date()
+    d0 = inp.date or today
+    d1 = _date.fromordinal(d0.toordinal() + 1)
 
+    # D0 特徴量（Open-Meteo → 日次集約）
+    om = OpenMeteoClient()
+    try:
+        feats: D0Features = build_d0_features_via_client(
+            lat=inp.lat, lon=inp.lon, target_date=d0, client=om, tz="Asia/Tokyo"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"feature_builder failed: {e}")
 
-# === Routes ===
-@router.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
+    backend = os.getenv("MODEL_BACKEND", "persistence").lower()
 
+    # persistence: 翌日=当日（ベースライン）
+    if backend == "persistence":
+        pred = {
+            "d1_mean": feats.d0_mean,
+            "d1_min": feats.d0_min,
+            "d1_max": feats.d0_max,
+            "d1_prec": feats.d0_prec,
+        }
+        return PredictOut(
+            backend=backend,
+            date_d0=d0,
+            date_d1=d1,
+            features=feats,
+            prediction=pred,
+        )
 
-@router.post("/predict", response_model=PredictResponse)
-def predict(payload: PredictRequest) -> PredictResponse:
-    backend = os.getenv("MODEL_BACKEND", "persistence")  # "persistence" | "regression"
-    model_path = os.getenv("MODEL_PATH", "./app/model/model.joblib")
+    # regression: パイプライン込みモデルで推論
+    model_path = os.getenv("MODEL_PATH", "app/model/model.joblib")
+    try:
+        reg = SimpleRegModel.load(model_path)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"failed to load model: {e}")
 
-    out, explain = predict_with_backend(
-        lat=payload.lat,
-        lon=payload.lon,
-        target_date=payload.target_date,
-        backend=backend,
-        model_path=model_path,
+    # パイプライン形式の入力（単日でも transform で欠損補完する）
+    df_daily = pd.DataFrame(
+        {
+            "date": pd.to_datetime([d0]),
+            "d_mean": [feats.d0_mean],
+            "d_min": [feats.d0_min],
+            "d_max": [feats.d0_max],
+            "d_prec": [feats.d0_prec],
+        }
     )
 
-    return PredictResponse(
-        location=Location(lat=payload.lat, lon=payload.lon),
-        target_date=payload.target_date,
-        prediction=Prediction(
-            temp_mean_c=out.temp_mean_c,
-            temp_min_c=out.temp_min_c,
-            temp_max_c=out.temp_max_c,
-            precip_mm=out.precip_mm,
-        ),
-        explanation=Explanation(
-            features_used=explain["features_used"].split(","),
-            notes=f"{explain['backend']}: {explain['notes']}",
-        ),
+    try:
+        y = reg.predict(df_daily).reshape(-1)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"model predict failed: {e}")
+
+    pred = {
+        "d1_mean": float(y[0]),
+        "d1_min": float(y[1]),
+        "d1_max": float(y[2]),
+        "d1_prec": float(y[3]),
+    }
+
+    return PredictOut(
+        backend="regression",
+        date_d0=d0,
+        date_d1=d1,
+        features=feats,
+        prediction=pred,
     )

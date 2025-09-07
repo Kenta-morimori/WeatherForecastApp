@@ -5,8 +5,8 @@ import json
 import os
 import time
 from dataclasses import dataclass
-from datetime import date
-from typing import Any, Dict, List, Tuple
+from datetime import date, datetime
+from typing import Any, Dict, Iterable, List, Mapping, Tuple
 
 import httpx
 
@@ -65,8 +65,19 @@ class OpenMeteoClient:
         self.retries = retries
         self.backoff = backoff_factor
 
-    def _cache_key(self, lat: float, lon: float, start: date, end: date) -> str:
-        return f"{lat:.4f}:{lon:.4f}:{start.isoformat()}:{end.isoformat()}"
+    # ===== 既存インターフェース（後方互換）====================================
+
+    def _cache_key(
+        self,
+        lat: float,
+        lon: float,
+        start: date,
+        end: date,
+        *,
+        hourly: str = "temperature_2m,precipitation",
+        tz: str = "auto",
+    ) -> str:
+        return f"{lat:.4f}:{lon:.4f}:{start.isoformat()}:{end.isoformat()}:{hourly}:{tz}"
 
     def get_forecast(self, lat: float, lon: float, start: date, end: date) -> ForecastResult:
         """
@@ -122,6 +133,65 @@ class OpenMeteoClient:
             temperature_2m=list(map(float, temp[:n])),
             precipitation=list(map(float, precip[:n])),
         )
+
+    # ===== feature_builder 向けの新インターフェース ============================
+
+    def get_hourly(
+        self,
+        *,
+        lat: float,
+        lon: float,
+        start: date | datetime,
+        end: date | datetime,
+        hourly: Iterable[str],
+        timezone: str = "Asia/Tokyo",
+    ) -> Mapping[str, Any]:
+        """
+        feature_builder 用の hourly 取得（生の Open-Meteo 形式を返す）
+        返り値: {"hourly": {...}, "hourly_units": {...}, ...}
+
+        - start/end は date or aware datetime を許容。APIへは YYYY-MM-DD で渡す。
+        - hourly はカンマ区切りで指定可能（例: ["temperature_2m","precipitation"]）
+        """
+        # date or datetime → date に正規化
+        start_date = start.date() if isinstance(start, datetime) else start
+        end_date = end.date() if isinstance(end, datetime) else end
+
+        hourly_param = ",".join(hourly)
+        key = self._cache_key(lat, lon, start_date, end_date, hourly=hourly_param, tz=timezone)
+        cached = _cache.get(key)
+        if cached:
+            return cached  # type: ignore[return-value]
+
+        params = {
+            "latitude": f"{lat}",
+            "longitude": f"{lon}",
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+            "hourly": hourly_param,
+            "timezone": timezone,
+        }
+        headers = {"User-Agent": USER_AGENT}
+
+        last_err: Exception | None = None
+        for attempt in range(1, self.retries + 1):
+            try:
+                with httpx.Client(timeout=self.timeout, headers=headers) as client:
+                    resp = client.get(f"{self.base_url}/v1/forecast", params=params)
+                    resp.raise_for_status()
+                    data = resp.json()
+                _cache.set(key, data)
+                return data
+            except Exception as e:
+                last_err = e
+                time.sleep(self.backoff * (2 ** (attempt - 1)))
+
+        assert last_err is not None
+        raise last_err
+
+    # 互換：呼び側が fetch_hourly を期待しても動くようにしておく
+    def fetch_hourly(self, **kwargs) -> Mapping[str, Any]:
+        return self.get_hourly(**kwargs)
 
 
 # --- ファイルキャッシュの簡易例（任意で使いたい時だけ） ---
