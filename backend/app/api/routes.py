@@ -1,8 +1,11 @@
+import os
 from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
+
+from app.ml.baseline import predict_with_backend
 
 router = APIRouter()
 
@@ -47,23 +50,28 @@ def health() -> dict[str, str]:
 
 @router.post("/predict", response_model=PredictResponse)
 def predict(payload: PredictRequest) -> PredictResponse:
-    """
-    モック応答（スキーマ準拠）
-    将来はここで特徴量生成＋推論を呼び出す
-    """
-    label = payload.name or f"{payload.lat:.3f},{payload.lon:.3f}"
+    backend = os.getenv("MODEL_BACKEND", "persistence")  # "persistence" | "regression"
+    model_path = os.getenv("MODEL_PATH", "./app/model/model.joblib")
+
+    out, explain = predict_with_backend(
+        lat=payload.lat,
+        lon=payload.lon,
+        target_date=payload.target_date,
+        backend=backend,
+        model_path=model_path,
+    )
 
     return PredictResponse(
         location=Location(lat=payload.lat, lon=payload.lon),
         target_date=payload.target_date,
         prediction=Prediction(
-            temp_mean_c=26.8,
-            temp_min_c=23.1,
-            temp_max_c=30.4,
-            precip_mm=4.6,
+            temp_mean_c=out.temp_mean_c,
+            temp_min_c=out.temp_min_c,
+            temp_max_c=out.temp_max_c,
+            precip_mm=out.precip_mm,
         ),
         explanation=Explanation(
-            features_used=["t_mean_d0", "t_max_d0", "humidity_d0", "wind_u_d0", "pressure_d0"],
-            notes=f"ダミー回帰（label={label}）。将来は地域別学習へ置き換え予定。",
+            features_used=explain["features_used"].split(","),
+            notes=f"{explain['backend']}: {explain['notes']}",
         ),
     )
