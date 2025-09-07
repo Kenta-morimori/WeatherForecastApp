@@ -33,3 +33,7 @@ jobs:
       - name: Frontend build
         working-directory: frontend
         run: pnpm build
+      
+      - name: Backend tests
+        working-directory: backend
+        run: uv run pytest -q
