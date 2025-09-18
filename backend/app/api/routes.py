@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import os
 from datetime import date as _date
-from datetime import datetime
 from typing import Dict
-from zoneinfo import ZoneInfo
 
 import pandas as pd
 from fastapi import APIRouter, HTTPException
@@ -13,6 +11,7 @@ from pydantic import BaseModel, Field
 from app.ml.baseline import SimpleRegModel
 from app.services.feature_builder import D0Features, build_d0_features_via_client
 from app.services.open_meteo import OpenMeteoClient
+from app.utils.datetime_utils import local_today_and_tomorrow
 
 router = APIRouter()
 
@@ -24,7 +23,10 @@ class Health(BaseModel):
 class PredictIn(BaseModel):
     lat: float = Field(ge=-90, le=90)
     lon: float = Field(ge=-180, le=180)
-    date: _date | None = None  # 省略時は Asia/Tokyo の「今日」を D0 とする
+    # 省略時は tz に基づくローカル「今日」を D0 とする
+    date: _date | None = None
+    # タイムゾーン名（IANA）。既定はアプリの開発想定 "Asia/Tokyo"
+    tz: str = "Asia/Tokyo"
 
 
 class PredictOut(BaseModel):
@@ -42,23 +44,25 @@ def health() -> Health:
 
 @router.post("/predict", response_model=PredictOut)
 def predict(inp: PredictIn) -> PredictOut:
-    tz = ZoneInfo("Asia/Tokyo")
-    today = datetime.now(tz=tz).date()
-    d0 = inp.date or today
-    d1 = _date.fromordinal(d0.toordinal() + 1)
+    # --- 日付確定（TZ/DST考慮） ---
+    if inp.date:
+        d0 = inp.date
+        d1 = _date.fromordinal(d0.toordinal() + 1)
+    else:
+        d0, d1 = local_today_and_tomorrow(inp.tz)
 
-    # D0 特徴量（Open-Meteo → 日次集約）
+    # --- D0 特徴量（Open-Meteo → 日次集約） ---
     om = OpenMeteoClient()
     try:
         feats: D0Features = build_d0_features_via_client(
-            lat=inp.lat, lon=inp.lon, target_date=d0, client=om, tz="Asia/Tokyo"
+            lat=inp.lat, lon=inp.lon, target_date=d0, client=om, tz=inp.tz
         )
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"feature_builder failed: {e}")
 
     backend = os.getenv("MODEL_BACKEND", "persistence").lower()
 
-    # persistence: 翌日=当日（ベースライン）
+    # --- persistence: 翌日=当日 ---
     if backend == "persistence":
         pred = {
             "d1_mean": feats.d0_mean,
@@ -74,14 +78,13 @@ def predict(inp: PredictIn) -> PredictOut:
             prediction=pred,
         )
 
-    # regression: パイプライン込みモデルで推論
+    # --- regression: パイプライン込みモデルで推論 ---
     model_path = os.getenv("MODEL_PATH", "app/model/model.joblib")
     try:
         reg = SimpleRegModel.load(model_path)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"failed to load model: {e}")
 
-    # パイプライン形式の入力（単日でも transform で欠損補完する）
     df_daily = pd.DataFrame(
         {
             "date": pd.to_datetime([d0]),
