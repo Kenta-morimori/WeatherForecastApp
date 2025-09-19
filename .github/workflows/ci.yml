@@ -66,15 +66,10 @@ jobs:
             backend/requirements.txt
             backend/requirements-dev.txt
 
-      - name: Install deps
-        shell: bash
+      - name: Install deps (pip)
         run: |
           set -eux
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
-          if [ ! -f requirements.txt ] && [ ! -f requirements-dev.txt ] && [ -f pyproject.toml ]; then
-            pip install -e . || true
-          fi
+          pip install -r requirements-dev.txt
 
       - name: Lint (ruff/black/isort)
         run: |

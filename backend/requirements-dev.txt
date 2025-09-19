@@ -1,5 +1,8 @@
+-r requirements.txt
+
+pytest>=8.0
+mypy>=1.10
 ruff>=0.5
 black>=24.0
 isort>=5.13
-mypy>=1.10
-pytest>=8.0
+types-python-dateutil>=2.9
