@@ -6,7 +6,7 @@ import os
 import time
 from dataclasses import dataclass
 from datetime import date, datetime
-from typing import Any, Dict, Iterable, List, Mapping, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Sequence, Tuple, Union
 
 import httpx
 
@@ -15,6 +15,10 @@ USER_AGENT = os.getenv(
     "OPEN_METEO_UA",
     "WeatherForecastApp/0.1 (+https://github.com/Kenta-morimori/WeatherForecastApp)",
 )
+
+ParamAtom = Union[str, int, float, bool, None]
+ParamSeq = Sequence[ParamAtom]
+ParamValue = Union[ParamAtom, ParamSeq]
 
 
 # ---- 簡易メモリキャッシュ（TTL秒） ----
@@ -92,7 +96,7 @@ class OpenMeteoClient:
         if cached:
             return cached
 
-        params = {
+        params: Dict[str, ParamValue] = {
             "latitude": lat,
             "longitude": lon,
             "start_date": start.isoformat(),
@@ -163,7 +167,7 @@ class OpenMeteoClient:
         if cached:
             return cached  # type: ignore[return-value]
 
-        params = {
+        params: Dict[str, ParamValue] = {
             "latitude": f"{lat}",
             "longitude": f"{lon}",
             "start_date": start_date.isoformat(),

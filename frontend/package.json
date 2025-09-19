@@ -7,10 +7,9 @@
 		"dev": "next dev --turbopack -p 3000",
 		"build": "next build --turbopack",
 		"start": "next start -p 3000",
-		"lint": "eslint .",
-		"typecheck": "tsc --noEmit",
-		"biome:check": "biome check .",
-		"biome:write": "biome check --write ."
+		"lint": "biome check .",
+		"lint:fix": "biome check --write .",
+		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
 		"@radix-ui/react-slot": "^1.2.3",

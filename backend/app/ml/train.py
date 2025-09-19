@@ -22,7 +22,9 @@ from .features import FeaturePipeline, FeaturePipelineConfig
 # --------------------------- データ生成（暫定: 合成） ---------------------------
 
 
-def make_synthetic_daily(seed: int = 42, n_days: int = 365 * 2) -> pd.DataFrame:
+def make_synthetic_daily(
+    seed: int = 42, n_days: int = 365 * 2
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     rng = np.random.default_rng(seed)
     start = datetime(2024, 1, 1)
     dates = [start + timedelta(days=i) for i in range(n_days)]
@@ -45,7 +47,7 @@ def make_synthetic_daily(seed: int = 42, n_days: int = 365 * 2) -> pd.DataFrame:
         }
     )
     y = df[["d_mean", "d_min", "d_max", "d_prec"]].shift(-1)
-    y.columns = ["d1_mean", "d1_min", "d1_max", "d1_prec"]
+    y.columns = pd.Index(["d1_mean", "d1_min", "d1_max", "d1_prec"])
     df = df.iloc[:-1].reset_index(drop=True)
     y = y.iloc[:-1].reset_index(drop=True)
     return df, y

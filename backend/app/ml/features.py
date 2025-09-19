@@ -5,6 +5,7 @@ from typing import Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
+from pandas.api.types import is_datetime64_any_dtype
 
 
 @dataclass
@@ -36,7 +37,14 @@ class FeaturePipeline:
         feat = self._add_features(df)
         # 学習データの統計量を記録（欠損/外れ値対策）
         self.medians_ = {
-            c: float(np.nanmedian(feat[c].values)) for c in feat.columns if c not in self._id_cols
+            c: float(
+                np.nanmedian(
+                    # ExtensionArray を避け、必ず float ndarray に統一
+                    pd.to_numeric(feat[c], errors="coerce").to_numpy(dtype=float, copy=False)
+                )
+            )
+            for c in feat.columns
+            if c not in self._id_cols
         }
         loq, hiq = self.config.clip_quantiles
         self.clip_bounds_ = {
@@ -96,7 +104,8 @@ class FeaturePipeline:
         if miss:
             raise ValueError(f"missing columns: {miss}")
         # 型・並び
-        if not np.issubdtype(df[self.config.date_col].dtype, np.datetime64):
+        # pandas の dtype 判定APIは ExtensionDtype も安全に扱える
+        if not is_datetime64_any_dtype(df[self.config.date_col]):
             df[self.config.date_col] = pd.to_datetime(df[self.config.date_col], errors="coerce")
         if df[self.config.date_col].isna().any():
             raise ValueError("date column contains NaT after parsing")
