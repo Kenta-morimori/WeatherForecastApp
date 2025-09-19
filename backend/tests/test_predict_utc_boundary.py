@@ -35,7 +35,6 @@ class _MockOM:
 
 @pytest.fixture(autouse=True)
 def mock_open_meteo(monkeypatch):
-    # routes が保持している参照自体を差し替える（ここが重要）
     from app.api import routes as routes_mod
 
     monkeypatch.setattr(routes_mod, "OpenMeteoClient", _MockOM)

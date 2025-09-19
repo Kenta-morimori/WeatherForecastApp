@@ -1,6 +1,7 @@
 -r requirements.txt
 
 pytest>=8.0
+pytest-timeout>=2.3
 mypy>=1.10
 ruff>=0.5
 black>=24.0

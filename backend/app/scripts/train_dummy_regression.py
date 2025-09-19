@@ -39,7 +39,7 @@ def main(seed: int = 42, n_days: int = 240) -> None:
 
     # 教師信号（翌日）
     y = df[["d_mean", "d_min", "d_max", "d_prec"]].shift(-1)
-    y.columns = ["d1_mean", "d1_min", "d1_max", "d1_prec"]
+    y.columns = pd.Index(["d1_mean", "d1_min", "d1_max", "d1_prec"])
 
     # 最終行はターゲットがないので除外
     df = df.iloc[:-1].reset_index(drop=True)

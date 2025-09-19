@@ -44,7 +44,8 @@ def create_app() -> FastAPI:
         allow_credentials=allow_credentials,
         allow_methods=allow_methods,
         allow_headers=allow_headers,
-        expose_headers=expose_headers or None,
+        # None を渡さず、常に Sequence[str]（空なら空タプル）を渡す
+        expose_headers=tuple(expose_headers),
     )
 
     # ---- Routes ----
