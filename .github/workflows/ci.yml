@@ -83,7 +83,7 @@ jobs:
           isort --check-only .
 
       - name: TypeCheck (mypy)
-        run: mypy --config-file backend/mypy.ini backend/app
+        run: mypy --config-file mypy.ini app
 
       - name: PyTest
         run: pytest -q
