@@ -39,3 +39,6 @@ yarn-error.log*
 !.env.example
 frontend/.env.local
 backend/.env
+
+# ML model artifacts
+backend/app/model/model.joblib
