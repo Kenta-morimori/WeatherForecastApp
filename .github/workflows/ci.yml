@@ -18,19 +18,28 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Setup Node
+      # 追加: pnpm をインストール
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'pnpm'
           cache-dependency-path: frontend/pnpm-lock.yaml
 
-      - name: Enable Corepack (pnpm)
+      # 任意（Corepack を併用したい場合）
+      - name: Enable Corepack
         run: corepack enable
 
-      - name: Install deps
+      - name: Install deps (pnpm)
         run: pnpm install --frozen-lockfile
 
       - name: Lint
@@ -74,7 +83,7 @@ jobs:
           isort --check-only .
 
       - name: TypeCheck (mypy)
-        run: mypy .
+        run: mypy --config-file backend/mypy.ini backend/app
 
       - name: PyTest
         run: pytest -q
