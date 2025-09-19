@@ -1,5 +1,7 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
+
 
 @dataclass
 class OpenMeteoClient:
@@ -18,5 +20,5 @@ class OpenMeteoClient:
             "lon": lon,
             "tz": tz,
             "days": days,
-            "daily": []  # 後で [ {date: 'YYYY-MM-DD', tmax:..., tmin:..., precip:...}, ... ] などに
+            "daily": [],  # 後で [ {date: 'YYYY-MM-DD', tmax:..., tmin:..., precip:...}, ... ] などに
         }

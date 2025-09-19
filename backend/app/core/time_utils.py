@@ -1,6 +1,8 @@
 from __future__ import annotations
+
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+
 
 def local_today_and_tomorrow(tz: str):
     """
