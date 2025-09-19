@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LinearRegression
 
-from app.ml.features import FeaturePipeline, FeaturePipelineConfig
+from ..ml.features import FeaturePipeline, FeaturePipelineConfig
 
 
 def main(seed: int = 42, n_days: int = 240) -> None:
