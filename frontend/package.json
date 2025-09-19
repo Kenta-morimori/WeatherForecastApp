@@ -14,7 +14,7 @@
 	},
 	"dependencies": {
 		"@radix-ui/react-slot": "^1.2.3",
-		"@tanstack/react-query": "^5.85.5",
+		"@tanstack/react-query": "^5.87.1",
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",
 		"lucide-react": "^0.542.0",
@@ -22,6 +22,7 @@
 		"react": "19.1.0",
 		"react-dom": "19.1.0",
 		"recharts": "^3.1.2",
+		"sonner": "^2.0.7",
 		"tailwind-merge": "^3.3.1",
 		"zod": "^4.1.5"
 	},
