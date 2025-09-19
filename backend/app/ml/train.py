@@ -17,7 +17,7 @@ from sklearn.metrics import mean_absolute_error, root_mean_squared_error
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.multioutput import MultiOutputRegressor
 
-from app.ml.features import FeaturePipeline, FeaturePipelineConfig
+from .features import FeaturePipeline, FeaturePipelineConfig
 
 # --------------------------- データ生成（暫定: 合成） ---------------------------
 
