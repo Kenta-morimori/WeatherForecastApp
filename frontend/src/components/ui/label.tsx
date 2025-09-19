@@ -1,21 +1,16 @@
-import { cn } from '@/lib/utils';
-import * as React from 'react';
+'use client';
+import type * as React from 'react';
 
-export type LabelProps = React.LabelHTMLAttributes<HTMLLabelElement>;
+type LabelProps = Omit<React.LabelHTMLAttributes<HTMLLabelElement>, 'htmlFor' | 'children'> & {
+	htmlFor: string;
+	children: React.ReactNode; // ← children を必須に
+};
 
-export const Label = React.forwardRef<HTMLLabelElement, LabelProps>(
-	({ className, children, ...props }, ref) => (
-		// biome-ignore lint/a11y/noLabelWithoutControl: this wrapper forwards `htmlFor` and/or wraps a control as children.
-		<label
-			ref={ref}
-			className={cn(
-				'text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70',
-				className,
-			)}
-			{...props}
-		>
+export function Label({ htmlFor, children, ...props }: LabelProps) {
+	return (
+		<label htmlFor={htmlFor} className="mb-1 block text-sm text-gray-700" {...props}>
 			{children}
 		</label>
-	),
-);
-Label.displayName = 'Label';
+	);
+}
+export default Label;
