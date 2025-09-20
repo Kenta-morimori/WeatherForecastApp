@@ -1,0 +1,17 @@
+.git
+frontend/
+**/node_modules
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache
+**/.ruff_cache
+**/.mypy_cache
+**/.venv
+dist/
+build/
+*.log
+*.parquet
+*.csv
+*.joblib
+*.pt
+*.h5
