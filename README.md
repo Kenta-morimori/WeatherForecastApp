@@ -249,38 +249,38 @@ uv run --project backend pytest -q
 ### 0. 前提
 - リポジトリは GitHub で管理している。
 - パッケージマネージャは `pnpm`。
-- Vercel GitHub App を **インストール**して、このリポジトリにアクセスを許可する。  
+- Vercel GitHub App を **インストール**して、このリポジトリにアクセスを許可する。
   （Vercel ダッシュボード → Add New → Project → Import Git Repository）
 
 ### 1. プロジェクト作成（Vercel）
-1. Vercel で **New Project** → このリポジトリを選択  
-2. **Root Directory**: `frontend` を選択（モノレポのため）  
-3. **Framework Preset**: Next.js（自動検知されることが多い）  
-4. **Production Branch**: `main` を指定（重要）  
-5. **Environment Variables**:  
-   - `NEXT_PUBLIC_API_BASE` を登録（値は運用環境の API ベース URL）  
-   - 必要に応じて他の `NEXT_PUBLIC_*` を追加  
-6. **Build & Output**: デフォルトの Next.js 設定でOK（本リポジトリは `frontend/vercel.json` を同梱）  
-7. **Domains**:  
-   - Preview は `*.vercel.app` が自動付与  
+1. Vercel で **New Project** → このリポジトリを選択
+2. **Root Directory**: `frontend` を選択（モノレポのため）
+3. **Framework Preset**: Next.js（自動検知されることが多い）
+4. **Production Branch**: `main` を指定（重要）
+5. **Environment Variables**:
+   - `NEXT_PUBLIC_API_BASE` を登録（値は運用環境の API ベース URL）
+   - 必要に応じて他の `NEXT_PUBLIC_*` を追加
+6. **Build & Output**: デフォルトの Next.js 設定でOK（本リポジトリは `frontend/vercel.json` を同梱）
+7. **Domains**:
+   - Preview は `*.vercel.app` が自動付与
    - 本番用カスタムドメインを使う場合はここで `Production` 側に設定する
 
 ### 2. GitHub 連携（Preview URL を PR に表示）
-- Vercel GitHub App を有効にすると、PR 作成・更新のたびに **Preview デプロイ**が走り、  
-  GitHub の PR 画面に **「Vercel — Preview ready」** のチェックと **Preview URL** が表示される。  
+- Vercel GitHub App を有効にすると、PR 作成・更新のたびに **Preview デプロイ**が走り、
+  GitHub の PR 画面に **「Vercel — Preview ready」** のチェックと **Preview URL** が表示される。
 - チーム開発では、この URL を使ってデザイン/動作確認をレビューする。
 
 ### 3. デプロイの挙動（DoD に対応）
-- **main へ merge/push**: 自動で **Production デプロイ**が走り、本番 URL が更新される（DoD①）。  
-- **PR ごと**: 自動で **Preview デプロイ**が作成され、PR 画面に **Preview URL** が表示される（DoD②）。  
-- モノレポ最適化: `frontend/vercel.json` の `ignoreCommand` により、  
+- **main へ merge/push**: 自動で **Production デプロイ**が走り、本番 URL が更新される（DoD①）。
+- **PR ごと**: 自動で **Preview デプロイ**が作成され、PR 画面に **Preview URL** が表示される（DoD②）。
+- モノレポ最適化: `frontend/vercel.json` の `ignoreCommand` により、
   main 以外のブランチでは **`frontend/` に差分が無い PR はスキップ**して無駄なビルドを抑制。
 
 ### 4. よくあるハマりどころ
-- **Root Directory 未設定**: リポジトリ直下をビルドしに行って失敗する → 必ず `frontend` を選ぶ。  
-- **環境変数不足**: `NEXT_PUBLIC_*` が未設定で API 呼び出しが失敗 → Vercel の Project Settings で設定。  
-- **Production Branch 未設定**: main にマージしても本番にならない → `main` を指定する。  
-- **pnpm のロックファイル**: CI と同様に `pnpm-lock.yaml` をコミットしておくと再現性が高い。  
+- **Root Directory 未設定**: リポジトリ直下をビルドしに行って失敗する → 必ず `frontend` を選ぶ。
+- **環境変数不足**: `NEXT_PUBLIC_*` が未設定で API 呼び出しが失敗 → Vercel の Project Settings で設定。
+- **Production Branch 未設定**: main にマージしても本番にならない → `main` を指定する。
+- **pnpm のロックファイル**: CI と同様に `pnpm-lock.yaml` をコミットしておくと再現性が高い。
 
 ## 📈 将来ロードマップ
 
