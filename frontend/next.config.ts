@@ -1,5 +1,7 @@
 import type { NextConfig } from 'next';
-const nextConfig: NextConfig = {
-	turbopack: { root: __dirname },
-};
+
+// 両方設定すると警告になるため、ここでは何もいじらない最小構成にしています。
+// （以前の `turbopack.root` 指定は削除）
+const nextConfig: NextConfig = {};
+
 export default nextConfig;

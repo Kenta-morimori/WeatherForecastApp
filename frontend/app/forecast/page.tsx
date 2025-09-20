@@ -1,7 +1,7 @@
 'use client';
 
 import { ResultCard } from '@/components/result-card';
-import { SearchForm } from '@/components/search-form';
+import { SearchForm, type SearchFormPayload } from '@/components/search-form';
 import { useState } from 'react';
 
 type Mock = {
@@ -16,14 +16,12 @@ export default function Page() {
 	const [mock, setMock] = useState<Mock | null>(null);
 
 	return (
-		<main className="space-y-6">
-			{/* ... 省略 ... */}
+		<main className="space-y-6 p-4">
 			<SearchForm
-				onSubmit={(payload) => {
+				onSubmit={(payload: SearchFormPayload) => {
 					const label =
 						payload.name?.trim() ||
 						`${Number(payload.lat).toFixed(3)}, ${Number(payload.lon).toFixed(3)}`;
-					// ✅ 必須項目をすべてセット
 					setMock({
 						locationLabel: label,
 						tempMean: 26.8,
