@@ -9,6 +9,12 @@ from .api.routes import router as api_router
 
 
 def _split_env_list(value: str, default: str) -> List[str]:
+    """
+    "a,b,c" のようなカンマ区切り環境変数を配列へ。
+    空/未設定なら default を使う。
+    例:
+      ALLOW_ORIGINS="https://your.prod.app,https://your.preview.app,http://localhost:3000"
+    """
     raw = value or default
     return [item.strip() for item in raw.split(",") if item.strip()]
 
@@ -19,7 +25,7 @@ def create_app() -> FastAPI:
         version="0.1.0",
     )
 
-    # ---- CORS settings (env 可変) ----
+    # ---- CORS settings（本番は厳密 Origin を列挙する）----
     allow_origins = _split_env_list(
         os.getenv("ALLOW_ORIGINS", ""),
         default="http://localhost:3000,http://127.0.0.1:3000",
@@ -44,7 +50,7 @@ def create_app() -> FastAPI:
         allow_credentials=allow_credentials,
         allow_methods=allow_methods,
         allow_headers=allow_headers,
-        # None を渡さず、常に Sequence[str]（空なら空タプル）を渡す
+        # None は渡さず、常に Sequence[str]（空なら空タプル）を渡す
         expose_headers=tuple(expose_headers),
     )
 
@@ -52,7 +58,12 @@ def create_app() -> FastAPI:
     # /predict を含む API ルーター
     app.include_router(api_router)
 
-    # /healthz: 監視・E2E ヘルスチェック用
+    # /health: DoD 用のヘルスチェック（200 を返す）
+    @app.get("/health", tags=["meta"])
+    def health():
+        return JSONResponse({"status": "ok"})
+
+    # 互換: 既存の /healthz も残す（必要なければ削除可）
     @app.get("/healthz", tags=["meta"])
     def healthz():
         return JSONResponse({"status": "ok"})
