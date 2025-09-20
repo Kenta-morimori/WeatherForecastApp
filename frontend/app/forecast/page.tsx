@@ -7,43 +7,32 @@ import { usePredict } from '@/hooks/usePredict';
 import { useEffect, useState } from 'react';
 
 export default function Page() {
+	const [params, setParams] = useState<{ lat: number; lon: number; tz?: string } | null>(null);
+	const { data, error, loading } = usePredict(params);
 	const { toast } = useToast();
-	const [query, setQuery] = useState<{ lat: number; lon: number } | null>(null);
 
-	const { data, error, loading } = usePredict(query ? { ...query, tz: 'Asia/Tokyo' } : null);
-
-	// ✅ エラーが変化した時だけトースト
 	useEffect(() => {
-		if (!error) return;
-		toast({
-			title: '取得に失敗しました',
-			description: error,
-			variant: 'destructive',
-		});
+		if (error) {
+			toast({ title: '取得に失敗しました', description: error, variant: 'destructive' });
+		}
 	}, [error, toast]);
 
 	return (
-		<main className="space-y-6 p-4">
+		<main className="space-y-6">
 			<SearchForm
 				onSubmit={(payload: SearchFormPayload) => {
-					const { lat, lon } = payload;
-					if (lat === '' || lon === '') {
-						toast({
-							title: '未対応',
-							description: '現在は緯度・経度の直接入力のみ対応しています。',
-						});
-						return;
-					}
-					setQuery({ lat: Number(lat), lon: Number(lon) });
+					setParams({
+						lat: Number(payload.lat),
+						lon: Number(payload.lon),
+						tz: 'Asia/Tokyo',
+					});
 				}}
 			/>
-
-			{loading && <div className="text-sm text-gray-500">予測を取得中…</div>}
-
+			{loading && <p>Loading...</p>}
 			{data && (
 				<div className="grid gap-4 md:grid-cols-2">
-					<ResultCard title="D0（今日）" data={data.d0} />
-					<ResultCard title="D1（明日）" data={data.d1} />
+					<ResultCard title="今日 (D0)" data={data.d0} />
+					<ResultCard title="明日 (D1)" data={data.d1} />
 				</div>
 			)}
 		</main>

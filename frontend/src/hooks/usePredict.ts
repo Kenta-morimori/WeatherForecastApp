@@ -8,29 +8,16 @@ export function usePredict(params: PredictInput | null) {
 	const [loading, setLoading] = useState(false);
 
 	useEffect(() => {
-		if (!params) {
-			setData(null);
-			setError(null);
-			setLoading(false);
-			return;
-		}
+		if (!params) return;
 		const ctrl = new AbortController();
-
-		(async () => {
-			try {
-				setLoading(true);
-				setError(null);
-				const res = await fetchPredict(params, ctrl.signal);
-				setData(res);
-			} catch (e) {
-				setError(e instanceof Error ? e.message : String(e));
-			} finally {
-				setLoading(false);
-			}
-		})();
-
+		setLoading(true);
+		setError(null);
+		fetchPredict(params, ctrl.signal)
+			.then(setData)
+			.catch((e) => setError(e instanceof Error ? e.message : String(e)))
+			.finally(() => setLoading(false));
 		return () => ctrl.abort();
-	}, [params]); // ✅ Biome が満足する形
+	}, [params]); // ← 依存は params のみ
 
 	return { data, error, loading };
 }
