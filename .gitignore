@@ -37,6 +37,7 @@ yarn-error.log*
 .env
 .env.*
 !.env.example
+!frontend/.env.example
 frontend/.env.local
 backend/.env
 
