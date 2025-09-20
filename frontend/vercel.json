@@ -1,0 +1,7 @@
+{
+  "version": 2,
+  "installCommand": "pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm build",
+  "outputDirectory": ".next",
+  "ignoreCommand": "bash -lc '\n  set -e\n  # main ブランチは常にデプロイ（build 実行）\n  if [ \"$VERCEL_GIT_COMMIT_REF\" = \"main\" ]; then\n    exit 1\n  fi\n  # 直前コミットとの差分から frontend/ 配下の変更が無ければスキップ（exit 0）\n  CHANGED=$(git diff --name-only \"$VERCEL_GIT_PREVIOUS_SHA\" \"$VERCEL_GIT_COMMIT_SHA\" || true)\n  echo \"$CHANGED\" | grep -qE \"^frontend/\" && exit 1 || exit 0\n'"
+}
