@@ -3,7 +3,7 @@ import type * as React from 'react';
 
 type LabelProps = Omit<React.LabelHTMLAttributes<HTMLLabelElement>, 'htmlFor' | 'children'> & {
 	htmlFor: string;
-	children: React.ReactNode; // ← children を必須に
+	children: React.ReactNode;
 };
 
 export function Label({ htmlFor, children, ...props }: LabelProps) {

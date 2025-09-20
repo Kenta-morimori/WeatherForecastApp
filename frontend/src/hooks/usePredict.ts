@@ -1,13 +1,23 @@
+'use client';
 import { type PredictInput, type PredictResponse, fetchPredict } from '@/lib/api';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 
-export function usePredict(input: PredictInput | null) {
-	return useQuery<PredictResponse, Error>({
-		queryKey: ['predict', input?.lat, input?.lon, input?.tz],
-		queryFn: ({ signal }) => {
-			if (!input) throw new Error('Missing input');
-			return fetchPredict(input, signal);
-		},
-		enabled: !!input,
-	});
+export function usePredict(params: PredictInput | null) {
+	const [data, setData] = useState<PredictResponse | null>(null);
+	const [error, setError] = useState<string | null>(null);
+	const [loading, setLoading] = useState(false);
+
+	useEffect(() => {
+		if (!params) return;
+		const ctrl = new AbortController();
+		setLoading(true);
+		setError(null);
+		fetchPredict(params, ctrl.signal)
+			.then(setData)
+			.catch((e) => setError(e instanceof Error ? e.message : String(e)))
+			.finally(() => setLoading(false));
+		return () => ctrl.abort();
+	}, [params]); // ← 依存は params のみ
+
+	return { data, error, loading };
 }

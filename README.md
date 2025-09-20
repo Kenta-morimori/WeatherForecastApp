@@ -1,264 +1,158 @@
 # WeatherForecastApp
 
-> 世界中の任意地点を指定し、**「明日の天気（気温・降水）」をAIモデルで予測**して Web に表示する MVP。
+> 世界中の任意地点を指定し、**「明日の天気（気温・降水）」を予測して表示**する MVP。
+> 現状はフロントエンドのみで **モックAPI（/predict）** を提供。実バックエンド接続は環境変数で切替。
+
+---
 
 ## 🎯 MVP スコープ
 
-* 入力: 地名または地図で選んだ座標（緯度経度）
-* 出力: 翌日の **平均気温 / 最高・最低気温 / 降水量** の予測値と、根拠（入力特徴の要約）
-* モバイル/デスクトップ対応の 1 画面（検索 → 結果表示）
-* 無料データソースのみを使用（API キー不要の範囲を優先）
-* 予測はサーバー（FastAPI）で実施し、フロント（Next.js）が表示
+* 入力: 地名または座標（緯度経度）
+* 出力: 翌日の **最高/最低/平均気温** と **降水量**（将来: 根拠の要約）
+* 単一画面（検索 → 結果表示）、モバイル/デスクトップ対応
+* まずは **モック応答**で体験を確認 → 後から本APIへ差し替え
 
-## 🏗️ アーキテクチャ概要（ASCII）
+---
+
+## 🏗️ アーキテクチャ（現状）
 
 ```
-+------------------------+            +------------------------+
-|        Frontend        |            |        Backend         |
-|  Next.js 14 (TS)       |  HTTP/JSON |  FastAPI (Python 3.11) |
-|  Tailwind + shadcn/ui  +----------->+  /api/predict          |
-|  React Query           |            |  /api/health           |
-+-----------+------------+            +-----------+------------+
-            |                                     |
-            | (lat,lon,date)                      | feature build + inference
-            |                                     v
-            |                         +-----------+------------+
-            |                         |      Data Layer        |
-            |                         |  Open-Meteo (forecast) |
-            |                         |  Open-Meteo Geocoding  |
-            |                         +-----------+------------+
-            |                                     |
-            |                          +----------v-----------+
-            |                          |     ML Model         |
-            +--------------------------+  (sklearn/LGBM等)    |
-                                       |   *MVPは軽量回帰     |
-                                       +----------------------+
++-----------------------------+
+| Frontend (Next.js 15 / TS)  |
+|  - /forecast  UI            |
+|  - /predict   API Route*    |  *モックJSONを返す
++--------------+--------------+
+               |
+               | (将来) NEXT_PUBLIC_BACKEND_URL を設定すると
+               v
++-----------------------------+
+| Backend (任意: FastAPI 等)  |
+|  - /predict                 |
++-----------------------------+
 ```
 
-## 🔧 技術選定（Why）
+* `NEXT_PUBLIC_BACKEND_URL` **未設定**: フロント内の `/predict`（モック）を叩く
+* `NEXT_PUBLIC_BACKEND_URL` **設定**: `https://<backend>/predict` を叩く（CORS要設定）
 
-* **Next.js 14 (App Router, TS)**: SS/CSR 切替が容易で、開発者体験が良い
-* **Tailwind / shadcn/ui**: 最短で整った UI
-* **React Query**: API フェッチとキャッシュの定番
-* **FastAPI**: 型＆ドキュメント自動生成で API 開発が高速
-* **scikit-learn（または LightGBM）**: 小規模データでの回帰に十分
-* **Open-Meteo**: API キー不要、地名→座標も提供、非商用 MVP に最適
+---
 
-## 🔄 データフロー
+## 🔄 ユーザーフロー
 
-1. フロントで地点検索（Open-Meteo Geocoding）→ 緯度経度を取得
-2. フロントが `/api/predict` に `{lat, lon, target_date}` を送信
-3. バックエンドで Open-Meteo から必要な予報/直近観測を取得し特徴量に変換
-4. 事前学習またはルールベース/単純回帰モデルで翌日の **気温/降水** を推定
-5. 推定結果を JSON で返却、フロントでカード表示
+1. `/forecast` で地名 or 緯度経度を入力（現状は緯度経度必須）
+2. フロントが `/predict?lat=...&lon=...&tz=...` を **GET**
+3. JSON を受け取り、**今日(D0)/明日(D1)** のカードを描画
+
+**モック応答 例**（ブラウザで `/predict?...` を開くと生JSONのみが表示されます）
+
+```json
+{
+  "d0": {"max": 28.1, "min": 22.4, "precip_prob": 0.31, "precip": 1.8},
+  "d1": {"max": 27.1, "min": 21.4, "precip_prob": 0.21, "precip": 0},
+  "forecast_series": [],
+  "recent_actuals": [],
+  "_meta": {"lat": 35.681, "lon": 139.767, "tz": "Asia/Tokyo", "mock": true}
+}
+```
+
+---
 
 ## 📁 リポジトリ構成（抜粋）
 
 ```
-.
-├─ frontend/     # Next.js 14 (TypeScript)
-│  ├─ app/       # App Router ページ
+frontend/
+├─ app/
+│  ├─ forecast/page.tsx          # 検索フォーム + 結果カード
+│  └─ predict/route.ts           # モックAPI（/predict）
+├─ src/
 │  ├─ components/
-│  ├─ lib/       # API クライアント等
-│  └─ biome.json # Biome 設定
-├─ backend/
-│  ├─ app/       # FastAPI アプリ（main.py, routers/）
-│  └─ pyproject.toml  # uv/依存定義・ツール設定
-├─ docs/
-│  └─ arch-overview.md  # 本READMEの詳細版（図、API I/O例）
-├─ .github/
-│  └─ workflows/
-│      └─ ci.yml       # CI（pre-commit 実行）
-├─ .editorconfig
-├─ .gitignore
-├─ .pre-commit-config.yaml
-└─ README.md
+│  │  ├─ result-card.tsx
+│  │  └─ ui/{button,input,label,card,use-toast}.tsx
+│  ├─ lib/
+│  │  ├─ api.ts                  # fetchPredict (NEXT_PUBLIC_BACKEND_URL を参照)
+│  │  ├─ utils.ts                # cn()
+│  │  └─ validation.ts           # zod スキーマ
+│  └─ hooks/                     # （必要に応じて）
+├─ next.config.ts
+└─ package.json
 ```
 
-## 🚀 セットアップ & 起動手順（DoD 充足）
+---
 
-> **前提**: Node.js 20+ / **pnpm 9+**、Python 3.11+ / **uv**
-> 以降は **ローカル/CI共通コマンド**で整形・静的解析が通るよう構成
+## 🔧 セットアップ & 起動
 
-### 0) 依存導入
+> 前提: **Node.js 20+ / pnpm 9+**
 
 ```bash
-# Frontend 依存
+# 依存導入
 pnpm -C frontend install
 
-# Backend 依存（uv）
-uv sync --project backend
-
-# pre-commit をフック登録（uvxで実行）
-uvx pre-commit install
-```
-
-### 1) Backend（FastAPI）
-
-```bash
-# 開発起動（ホットリロード）
-uvx uvicorn backend.app.main:app --reload --port 8000
-# 動作確認:
-# GET http://127.0.0.1:8000/api/health  → {"status":"ok"}
-```
-
-### 2) Frontend（Next.js）
-
-```bash
+# 開発起動
 pnpm -C frontend dev
-# 既定: http://localhost:3000
-# 画面から地点検索→予測が返れば OK
+# → http://localhost:3000/forecast
 ```
 
-### ✅ DoD コマンド（ローカル/CI共通）
+### 環境変数（フロント）
+
+* `NEXT_PUBLIC_BACKEND_URL`（任意）
+  未設定ならフロントの `/predict`（モック）を使用。
+  設定する場合は **スキーム付き・末尾スラなし**で例: `https://api.example.com`
+
+---
+
+## 🧪 品質チェック（ローカル/CI 共通）
 
 ```bash
+# Biome / フォーマット・Lint、他 pre-commit フック
 uvx pre-commit run -a
+# 型チェック（必要なら）
+pnpm -C frontend typecheck
 ```
 
-## 🔐 環境変数（一覧）
+> Biome の non-null assertion（`!`）等は警告対象です。`?.` で置換してください。
 
-**Frontend (`frontend/.env.local`)**
+---
 
-* `NEXT_PUBLIC_API_BASE_URL` … 例: `http://127.0.0.1:8000`
-* `NEXT_PUBLIC_APP_NAME` … 表示用アプリ名（任意）
+## 🚀 デプロイ（Vercel / Frontend）
 
-**Backend (`backend/.env`)**
+1. Vercel の **New Project** → 本リポジトリを選択
+2. **Root Directory**: `frontend`
+3. **Framework Preset**: Next.js（自動検知）
+4. **Production Branch**: `main`
+5. **Environment Variables**（必要に応じて）
 
-* `ALLOW_ORIGINS` … CORS 許可（例: `http://localhost:3000`）
-* `MODEL_PATH` … 学習済みモデルのパス（例: `./app/model/model.joblib`、未学習時はダミー回帰）
-* `OPEN_METEO_BASE` … 例: `https://api.open-meteo.com`
-* `OPEN_METEO_GEOCODING` … 例: `https://geocoding-api.open-meteo.com/v1`
+   * `NEXT_PUBLIC_BACKEND_URL` = `https://<your-backend>`
+     （モックで良ければ未設定のままでOK）
+6. デプロイ後、`/forecast` で動作確認
+   `/predict?...` は **生JSONのみ**が出れば正常
 
-> MVPは API キー不要設計（Open-Meteo）。商用化/高精度化時は有料APIやキャッシュ層を追加。
+> ※ モノレポ最適化をする場合は `vercel.json` の `ignoreCommand` で
+> 「`frontend/` に差分がない PR はスキップ」などのチューニングが可能です。
 
-## 🧱 開発基盤（整形 / 静的解析 / フック）
+---
 
-* **Python（backend/）**
+## 🔌 バックエンドをつなぐ時（任意）
 
-  * Lint/Format: `ruff`, `black`, `isort`
-  * テスト: `pytest`
-  * 実行: `uvx` 経由（バージョン固定・環境差異の最小化）
-* **TypeScript（frontend/）**
+* 期待するエンドポイント: `GET /predict?lat=<num>&lon=<num>&tz=<IANA TZ>`
+* 返却 JSON は上記モックと同形が望ましい
+* CORS: フロント配信元（Vercel の Preview/Production ドメイン）を許可
 
-  * Lint/Format: **Biome**（`pnpm -C frontend biome:check` / `biome:write`）
-  * 型検査: `tsc --noEmit`（`pnpm -C frontend typecheck` など）
-* **pre-commit（ルート）**
+---
 
-  * `uvx pre-commit run -a` … すべてのフック（Python: ruff/black/isort、TS: Biome、共通: end-of-file/trailing-whitespace 等）を実行
-  * CI でも同一コマンドを実行（`.github/workflows/ci.yml`）
+## 📈 ロードマップ
 
-## Credits
-- Weather data powered by **Open-Meteo** (https://open-meteo.com/).
-  本アプリは Open-Meteo の無償APIを利用しています（非商用MVP用途）。
+* [ ] 地名 → 座標のジオコーディング（UI/自動補完）
+* [ ] 折れ線チャート（`forecast_series` / `recent_actuals` の可視化）
+* [ ] 実API接続（FastAPI 等）+ 推論ロジック
+* [ ] 入力バリデーション拡充・エラーメッセージ整備
+* [ ] E2E テスト / モバイル最適化の微調整
 
-## 📚 用語定義（Glossary）
-
-* **MVP**: 最小実用製品。今回は「翌日の気温/降水を返す」まで
-* **Inference**: 学習済みモデルによる推論
-* **Feature Engineering**: 外部データを入力特徴に加工する工程
-* **Geocoding**: 地名→緯度経度への変換
-
-## 🧪 テスト
-
-* Frontend: `pnpm -C frontend test`（Vitest など） / `pnpm -C frontend lint`（必要に応じて）
-* Backend: `uvx pytest` / `uvx ruff check backend`（`--fix` で自動修正）
-
-## 🔧 Backend: 学習→保存→推論（最短手順）
-
-### 1) 学習（GBDT + 残差学習）
-```bash
-# リポジトリ直下
-uv run --project backend python -m app.ml.train --seed 42 --n-days 720 --splits 5 --residual
-# => models/YYYYMMDD_<gitSHA>_gbdt.joblib が保存される
-```
-
-### 2) モデル切替（推論で使用）
-
-- `backend/.env.example` を参考に `.env` を設定（開発時は export でもOK）
-- 例：backend 直下で起動する場合
-
-```bash
-cd backend
-export MODEL_BACKEND=regression
-export MODEL_PATH=./models/<YYYYMMDD>_<gitSHA>_gbdt.joblib
-uv run uvicorn app.main:app --reload --port 8000
-```
-
-運用のコツ：最新モデルにシンボリックリンクを張る
-
-```bash
-# リポジトリ直下
-ln -sfn "$(ls models/*_gbdt.joblib | tail -n1)" models/latest_gbdt.joblib
-# 起動時は MODEL_PATH=./models/latest_gbdt.joblib で固定
-```
-
-### 3) 疎通
-
-```bash
-curl -s -X POST 'http://127.0.0.1:8000/predict' \
-  -H 'Content-Type: application/json' \
-  -d '{"lat":35.6762,"lon":139.6503}' | jq
-```
-
-## 🧪 CI（GitHub Actions）
-
-- CIは以下を実行
-  - pre-commit（ruff/black/isort/Biome）
-  - Frontend build（pnpm）
-  - Backend pytest（ユニット + E2Eモック）
-- 参考: .github/workflows/ci.yml
-
-🌐 環境変数（Backend 抜粋）
-
-- `MODEL_BACKEND`: `persistence` | `regression`（既定: `persistence`）
-- `MODEL_PATH`: 学習成果物の `.joblib`（`regression` 時のみ必須）
-- `OPEN_METEO_*`: Open-Meteo クライアント設定
-- `ALLOW_ORIGINS`: CORS 設定（開発では `http://localhost:3000`）
-
-# 実行手順（コピペ用）
-
-```bash
-# 1) 依存
-pnpm -C frontend install
-uv sync --project backend
-
-# 2) 学習
-uv run --project backend python -m app.ml.train --seed 42 --n-days 720 --splits 5 --residual
-
-# 3) モデル切替でAPI起動（backend直下）
-cd backend
-export MODEL_BACKEND=regression
-export MODEL_PATH=./models/$(ls ../models/*_gbdt.joblib | xargs -n1 basename | tail -n1)  # 直近を指す例
-uv run uvicorn app.main:app --reload --port 8000
-
-# 4) 疎通
-curl -s -X POST 'http://127.0.0.1:8000/predict' \
-  -H 'Content-Type: application/json' \
-  -d '{"lat":35.6762,"lon":139.6503}' | jq
-
-# 5) テスト（任意）
-cd ..
-uv run --project backend pytest -q
-```
-
-## 📈 将来ロードマップ
-
-* [ ] モデル高度化（時系列外生変数、アンサンブル、地域別バリアント）
-* [ ] キャッシュ層 & レート制御（Redis / Cloudflare など）
-* [ ] 地図 UI（ドラッグで地点選択、履歴/お気に入り）
-* [ ] CI/CD（Actions で frontend/backend のビルド・テスト → デプロイ）
-* [ ] 監視（死活監視、APM、フロントのWeb Vitals）
-* [ ] i18n（英語/日本語切替）
-* [ ] アクセス解析（匿名）
-
-## 🩺 ヘルスチェック
-
-* `GET /api/health` → `{"status":"ok"}` を返せば正常
+---
 
 ## 👥 貢献
 
-* Issue / PR 歓迎。コミット規約と Linter に従ってください。
+Issue / PR 歓迎。Lint/Format に従い、小さな変更でも遠慮なくどうぞ。
+
+---
 
 ## 📜 ライセンス
 

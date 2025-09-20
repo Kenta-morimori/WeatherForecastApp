@@ -21,7 +21,7 @@ export function SearchForm({
 	const [form, setForm] = useState<SearchFormPayload>({ name: '', lat: '', lon: '' });
 	const [error, setError] = useState<string | null>(null);
 
-	const handleSubmit = (e: React.FormEvent) => {
+	const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 		const parsed = zLocation.safeParse(form);
 		if (!parsed.success) {
@@ -45,7 +45,9 @@ export function SearchForm({
 							id="name"
 							placeholder="任意（※緯度経度の代わりにどちらか一方でOK）"
 							value={form.name ?? ''}
-							onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
+							onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+								setForm((s) => ({ ...s, name: e.target.value }))
+							}
 						/>
 					</div>
 
@@ -58,7 +60,9 @@ export function SearchForm({
 								step="any"
 								placeholder="例: 35.681"
 								value={form.lat ?? ''}
-								onChange={(e) => setForm((s) => ({ ...s, lat: e.target.value }))}
+								onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+									setForm((s) => ({ ...s, lat: e.target.value }))
+								}
 							/>
 						</div>
 						<div className="grid gap-2">
@@ -69,12 +73,14 @@ export function SearchForm({
 								step="any"
 								placeholder="例: 139.767"
 								value={form.lon ?? ''}
-								onChange={(e) => setForm((s) => ({ ...s, lon: e.target.value }))}
+								onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+									setForm((s) => ({ ...s, lon: e.target.value }))
+								}
 							/>
 						</div>
 					</div>
 
-					{error && <p className="text-sm text-destructive">{error}</p>}
+					{error && <p className="text-sm text-red-600">{error}</p>}
 
 					<div className="flex justify-end">
 						<Button type="submit">予測する（モック）</Button>
