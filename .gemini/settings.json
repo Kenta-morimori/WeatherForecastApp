@@ -1,10 +1,7 @@
 {
-    "general": { "checkpointing": { "enabled": true } },
-    "tools": {
-        "allowed": ["read_file", "write_file", "replace", "glob", "search_file_content", "web_fetch"],
-        "blocked": ["run_shell_command"]
-    },
-    "workspace": {
-        "includeDirectories": ["backend", "frontend", "backend/tests", "tests"]
-    }
+  "tools": {
+    "allowed": ["read_file","write_file","replace","glob","search_file_content","web_fetch"],
+    "blocked": ["run_shell_command"]
+  },
+  "workspace": { "includeDirectories": ["backend","frontend","tests","backend/tests"] }
 }
