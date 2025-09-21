@@ -5,6 +5,6 @@
         "blocked": ["run_shell_command"]
     },
     "workspace": {
-        "includeDirectories": ["backend", "frontend"]
+        "includeDirectories": ["backend", "frontend", "backend/tests", "tests"]
     }
 }
