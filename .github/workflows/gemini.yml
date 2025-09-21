@@ -18,12 +18,14 @@ concurrency:
 
 jobs:
   draft-pr:
-    # ai-task ラベル or @gemini-cli メンション で実行。手動トリガーも可。
+    # ラベル "ai-task" か、コメントに "@gemini-cli" が含まれるときに実行（手動実行も可）
     if: >
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'ai-task') ||
       (github.event_name == 'issue_comment' && github.event.action == 'created' && contains(github.event.comment.body, '@gemini-cli'))
     runs-on: ubuntu-latest
+    environment: preview
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -39,7 +41,7 @@ jobs:
         run: npm i -g @google/gemini-cli@latest
 
       - name: Prepare scoped settings (runner only)
-        # リポジトリに含めない一時 .gemini/settings.json（後でコミット対象外）
+        # ランナー上に一時 .gemini/settings.json を作成（コミット対象外）
         run: |
           mkdir -p .gemini
           cat > .gemini/settings.json <<'JSON'
@@ -61,19 +63,18 @@ jobs:
             let source = 'manual';
             let task = '';
             let num = context.runId;
-            let base = ev.repository?.default_branch || 'main';
+            let base = ev?.repository?.default_branch || 'main';
 
             if (context.eventName === 'issues' && ev.action === 'labeled' && ev.label?.name === 'ai-task') {
               source = `issue #${ev.issue.number}`;
               num = ev.issue.number;
-              task = `Title: ${ev.issue.title}\n\nBody:\n${ev.issue.body || ''}`;
+              task = `Title: ${ev.issue.title}\n\n${ev.issue.body || ''}`;
             } else if (context.eventName === 'issue_comment' && ev.action === 'created' && ev.comment?.body?.includes('@gemini-cli')) {
               source = (ev.issue?.pull_request ? `pr #${ev.issue.number}` : `issue #${ev.issue.number}`);
-              num = ev.issue.number || context.runId;
-              // メンションを除去して依頼本文を抽出
-              task = (ev.comment.body || '').replace('@gemini-cli', '').trim();
+              num = ev.issue?.number || context.runId;
+              task = (ev.comment.body || '').replace(/@gemini-cli/g, '').trim();
             } else {
-              task = 'No task provided (workflow_dispatch). Describe your task in the Issue and apply label "ai-task" or comment with @gemini-cli next time.';
+              task = 'No task provided (workflow_dispatch).';
             }
 
             core.setOutput('source', source);
@@ -81,20 +82,40 @@ jobs:
             core.setOutput('branch', `ai/gemini/${num}`);
             core.setOutput('base', base);
 
-      - name: Run gemini (edit only backend/frontend/tests)
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      - name: Write AI summary & prompt
         run: |
           echo "### AI Task from ${{ steps.prep.outputs.source }}" > AI_SUMMARY.md
           printf '\n%s\n' "${{ steps.prep.outputs.task }}" >> AI_SUMMARY.md
 
+          # PROMPT.txt を作り、タスク内容を埋め込む（@ ディレクティブ誤作動を避けるため直接埋め込み）
+          cat > PROMPT.txt <<'EOS'
+          You are a repository code editor running on CI.
+          Apply the following task to this repo with minimal and safe edits.
+
+          === Task ===
+          EOS
+          printf '%s\n' "${{ steps.prep.outputs.task }}" >> PROMPT.txt
+          cat >> PROMPT.txt <<'EOS'
+
+          === Constraints ===
+          - Only modify files under backend/, frontend/, or tests/.
+          - Do not create or change files outside these paths.
+          - Keep changes minimal and self-contained.
+          - Ensure code compiles and tests can run.
+          - After edits, append a concise "### Changes" bullet list to AI_SUMMARY.md (do not overwrite existing text).
+
+          Return only code edits using built-in file tools.
+          EOS
+
+      - name: Run gemini (edit only backend/frontend/tests)
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
           gemini --include-directories backend,frontend,tests \
             --approval-mode=auto_edit \
             --allowed-tools write_file,replace,read_file,glob \
             -m gemini-1.5-flash \
-            "You are a repository code editor. Only modify files under backend/, frontend/, or tests/. Do not touch any other paths.
-             Implement the task described in AI_SUMMARY.md with minimal, safe edits and clear commit-worthy changes.
-             After applying edits, append a '### Changes' section with a concise bullet list to AI_SUMMARY.md."
+            "$(cat PROMPT.txt)"
 
       - name: Commit changes (limit paths; do not include .gemini)
         id: changes
@@ -102,7 +123,7 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # 変更の有無を backend/frontend/tests/AI_SUMMARY.md に限定して判定
+          # backend/frontend/tests/AI_SUMMARY.md のみを対象に変更有無を判定
           if git diff --quiet -- backend frontend tests AI_SUMMARY.md 2>/dev/null; then
             echo "changed=false" >> $GITHUB_OUTPUT
             echo "No changes produced by gemini."
