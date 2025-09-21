@@ -1,9 +1,10 @@
 import os
 from typing import List
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .api.routes import router as api_router
 
@@ -67,6 +68,17 @@ def create_app() -> FastAPI:
     @app.get("/healthz", tags=["meta"])
     def healthz():
         return JSONResponse({"status": "ok"})
+
+    # ---- Error Handlers ----
+    # 404 など Starlette 側の HTTPException も {error: ...} で返す
+    @app.exception_handler(StarletteHTTPException)
+    async def starlette_http_exception_handler(request: Request, exc: StarletteHTTPException):
+        return JSONResponse(status_code=exc.status_code, content={"error": exc.detail})
+
+    # FastAPI 側で raise した HTTPException も {error: ...} で返す
+    @app.exception_handler(HTTPException)
+    async def http_exception_handler(request: Request, exc: HTTPException):
+        return JSONResponse(status_code=exc.status_code, content={"error": exc.detail})
 
     return app
 
