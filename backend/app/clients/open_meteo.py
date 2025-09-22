@@ -15,6 +15,7 @@ QP = Union[QPAtom, Sequence[QPAtom]]
 try:
     from ..observability import record_ext_api_call  # type: ignore
 except Exception:  # pragma: no cover
+
     def record_ext_api_call(url: str, status: int, duration_ms: float) -> None:  # type: ignore
         return
 
@@ -23,7 +24,9 @@ except Exception:  # pragma: no cover
 class OpenMeteoClient:
     timeout: float = 10.0
     base_url: str = "https://api.open-meteo.com/v1/forecast"
-    user_agent: str = "WeatherForecastApp/0.1 (+https://github.com/Kenta-morimori/WeatherForecastApp)"
+    user_agent: str = (
+        "WeatherForecastApp/0.1 (+https://github.com/Kenta-morimori/WeatherForecastApp)"
+    )
 
     async def fetch_recent_daily(
         self, lat: float, lon: float, tz: str, days: int = 14
