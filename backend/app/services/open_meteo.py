@@ -1,4 +1,3 @@
-# backend/app/services/open_meteo.py
 from __future__ import annotations
 
 import asyncio
