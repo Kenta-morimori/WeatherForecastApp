@@ -1,6 +1,6 @@
-# backend/app/services/open_meteo.py
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import time
@@ -9,6 +9,20 @@ from datetime import date, datetime
 from typing import Any, Dict, Iterable, List, Mapping, Sequence, Tuple, Union
 
 import httpx
+
+# --- 追加：QueryParam互換の型エイリアス ---
+QPAtom = Union[str, int, float, bool, None]
+QP = Union[QPAtom, Sequence[QPAtom]]
+# --------------------------------------
+
+# --- 可観測性（存在しない環境でも動くように no-op フォールバック） ---
+try:
+    from app.observability import record_ext_api_call  # type: ignore
+except Exception:  # pragma: no cover
+
+    def record_ext_api_call(url: str, status: int, duration_ms: float) -> None:  # type: ignore
+        return
+
 
 DEFAULT_BASE = os.getenv("OPEN_METEO_BASE", "https://api.open-meteo.com")
 USER_AGENT = os.getenv(
@@ -43,6 +57,24 @@ class _TTLCache:
 
 
 _cache = _TTLCache(ttl_seconds=int(os.getenv("OPEN_METEO_CACHE_TTL", "300")))
+
+# /forecast（日次）専用のTTLキャッシュ（独立設定可能）
+_daily_cache = _TTLCache(ttl_seconds=int(os.getenv("OPEN_METEO_DAILY_CACHE_TTL", "300")))
+
+
+def _daily_cache_key(lat: float, lon: float, tz: str, days: int) -> str:
+    return f"daily:{lat:.4f}:{lon:.4f}:{tz}:{int(days)}"
+
+
+# AsyncClient の再利用（DNS/TLS再確立を回避してレイテンシ低減）
+_async_client: httpx.AsyncClient | None = None
+
+
+def _get_async_client(timeout: float, headers: Dict[str, str]) -> httpx.AsyncClient:
+    global _async_client
+    if _async_client is None:
+        _async_client = httpx.AsyncClient(timeout=timeout, headers=headers)
+    return _async_client
 
 
 @dataclass(frozen=True)
@@ -110,17 +142,17 @@ class OpenMeteoClient:
         for attempt in range(1, self.retries + 1):
             try:
                 with httpx.Client(timeout=self.timeout, headers=headers) as client:
-                    resp = client.get(f"{self.base_url}/v1/forecast", params=params)
+                    resp = client.get(
+                        f"{self.base_url}/v1/forecast", params=httpx.QueryParams(params)
+                    )
                     resp.raise_for_status()
                     data = resp.json()
                 result = self._parse(data)
                 _cache.set(key, result)
                 return result
-            except Exception as e:  # noqa: BLE001（シンプルにまとめる）
+            except Exception as e:  # noqa: BLE001
                 last_err = e
-                # 簡易エクスポネンシャルバックオフ
                 time.sleep(self.backoff * (2 ** (attempt - 1)))
-        # すべて失敗したら例外
         assert last_err is not None
         raise last_err
 
@@ -130,7 +162,6 @@ class OpenMeteoClient:
         times = hourly.get("time") or []
         temp = hourly.get("temperature_2m") or []
         precip = hourly.get("precipitation") or []
-        # 正規化：長さを揃える（不足分は切り詰め）
         n = min(len(times), len(temp), len(precip))
         return ForecastResult(
             times=list(times[:n]),
@@ -153,11 +184,7 @@ class OpenMeteoClient:
         """
         feature_builder 用の hourly 取得（生の Open-Meteo 形式を返す）
         返り値: {"hourly": {...}, "hourly_units": {...}, ...}
-
-        - start/end は date or aware datetime を許容。APIへは YYYY-MM-DD で渡す。
-        - hourly はカンマ区切りで指定可能（例: ["temperature_2m","precipitation"]）
         """
-        # date or datetime → date に正規化
         start_date = start.date() if isinstance(start, datetime) else start
         end_date = end.date() if isinstance(end, datetime) else end
 
@@ -181,7 +208,9 @@ class OpenMeteoClient:
         for attempt in range(1, self.retries + 1):
             try:
                 with httpx.Client(timeout=self.timeout, headers=headers) as client:
-                    resp = client.get(f"{self.base_url}/v1/forecast", params=params)
+                    resp = client.get(
+                        f"{self.base_url}/v1/forecast", params=httpx.QueryParams(params)
+                    )
                     resp.raise_for_status()
                     data = resp.json()
                 _cache.set(key, data)
@@ -189,13 +218,72 @@ class OpenMeteoClient:
             except Exception as e:
                 last_err = e
                 time.sleep(self.backoff * (2 ** (attempt - 1)))
-
         assert last_err is not None
         raise last_err
 
-    # 互換：呼び側が fetch_hourly を期待しても動くようにしておく
     def fetch_hourly(self, **kwargs) -> Mapping[str, Any]:
         return self.get_hourly(**kwargs)
+
+    # ===== 追加: /forecast 用（非同期・日次サマリー）==========================
+
+    async def fetch_recent_daily(
+        self,
+        lat: float,
+        lon: float,
+        tz: str,
+        days: int = 14,
+    ) -> Dict[str, Any]:
+        """
+        直近 `days` 日の **日次サマリー** を取得（最高/最低気温・降水量）。
+        - Open-Meteoでは過去データ取得に `past_days` を利用（上限 92）
+        - 返り値は Open-Meteo の **生JSON** を返す（routes 側で整形）
+        - 可観測性: 各試行ごとに record_ext_api_call(...) を記録
+        - 最適化: 5分TTLキャッシュ, AsyncClient再利用
+        """
+        past_days = max(1, min(int(days), 92))
+        key = _daily_cache_key(lat, lon, tz, past_days)
+        cached = _daily_cache.get(key)
+        if cached:
+            return cached  # type: ignore[return-value]
+
+        params: Dict[str, ParamValue] = {
+            "latitude": lat,
+            "longitude": lon,
+            "daily": "temperature_2m_max,temperature_2m_min,precipitation_sum",
+            "timezone": tz,
+            "past_days": past_days,
+        }
+        headers = {"User-Agent": USER_AGENT}
+        url = f"{self.base_url}/v1/forecast"
+
+        client = _get_async_client(self.timeout, headers)
+
+        last_err: Exception | None = None
+        for attempt in range(1, self.retries + 1):
+            status = 599
+            t1 = time.perf_counter()
+            try:
+                resp = await client.get(url, params=httpx.QueryParams(params))
+                status = resp.status_code
+                resp.raise_for_status()
+                data = resp.json()
+                # 観測記録（成功試行）
+                dt_ms = (time.perf_counter() - t1) * 1000.0
+                record_ext_api_call(url=url, status=status, duration_ms=dt_ms)
+                _daily_cache.set(key, data)
+                return data
+            except Exception as e:
+                # 観測記録（失敗試行）
+                dt_ms = (time.perf_counter() - t1) * 1000.0
+                record_ext_api_call(url=url, status=status, duration_ms=dt_ms)
+                last_err = e
+                if attempt < self.retries:
+                    await asyncio.sleep(self.backoff * (2 ** (attempt - 1)))
+                else:
+                    break
+
+        assert last_err is not None
+        raise last_err
 
 
 # --- ファイルキャッシュの簡易例（任意で使いたい時だけ） ---

@@ -9,7 +9,7 @@ Title: [gemini-cliテスト] コード全体の冗長箇所チェックと最小
 - 変更は既存挙動を保持（ノンブレイキング）。危険度が中〜高の箇所は **提案のみ**（AI_SUMMARY.md）にとどめる。
 
 ## Scope
-- 対象ディレクトリ: , , 
+- 対象ディレクトリ: , ,
 - それ以外（CI, infra, .github配下, package管理, lockファイル 等）は変更しない。
 
 ## Must / Constraints
