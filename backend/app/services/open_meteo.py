@@ -11,6 +11,11 @@ from typing import Any, Dict, Iterable, List, Mapping, Sequence, Tuple, Union
 
 import httpx
 
+# --- 追加：QueryParam互換の型エイリアス ---
+QPAtom = Union[str, int, float, bool, None]
+QP = Union[QPAtom, Sequence[QPAtom]]
+# --------------------------------------
+
 # --- 可観測性（存在しない環境でも動くように no-op フォールバック） ---
 try:
     from app.observability import record_ext_api_call  # type: ignore
@@ -138,7 +143,9 @@ class OpenMeteoClient:
         for attempt in range(1, self.retries + 1):
             try:
                 with httpx.Client(timeout=self.timeout, headers=headers) as client:
-                    resp = client.get(f"{self.base_url}/v1/forecast", params=params)
+                    resp = client.get(
+                        f"{self.base_url}/v1/forecast", params=httpx.QueryParams(params)
+                    )
                     resp.raise_for_status()
                     data = resp.json()
                 result = self._parse(data)
@@ -202,7 +209,9 @@ class OpenMeteoClient:
         for attempt in range(1, self.retries + 1):
             try:
                 with httpx.Client(timeout=self.timeout, headers=headers) as client:
-                    resp = client.get(f"{self.base_url}/v1/forecast", params=params)
+                    resp = client.get(
+                        f"{self.base_url}/v1/forecast", params=httpx.QueryParams(params)
+                    )
                     resp.raise_for_status()
                     data = resp.json()
                 _cache.set(key, data)
@@ -255,7 +264,7 @@ class OpenMeteoClient:
             status = 599
             t1 = time.perf_counter()
             try:
-                resp = await client.get(url, params=params)
+                resp = await client.get(url, params=httpx.QueryParams(params))
                 status = resp.status_code
                 resp.raise_for_status()
                 data = resp.json()
