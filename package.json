@@ -1,6 +1,8 @@
 {
 	"dependencies": {
 		"@tanstack/react-query": "^5.89.0",
+		"leaflet": "^1.9.4",
+		"react-leaflet": "^5.0.0",
 		"recharts": "^3.2.1"
 	}
 }

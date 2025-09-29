@@ -1,13 +1,16 @@
+// frontend/app/layout.tsx
 import './globals.css';
-import { ToastProvider } from '@/components/ui/use-toast';
-import type { ReactNode } from 'react';
+import 'leaflet/dist/leaflet.css'; // ★ ここで読み込む
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export const metadata = {
+	title: 'Weather Forecast App',
+	description: "Tomorrow's weather forecast with AI",
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
 	return (
 		<html lang="ja">
-			<body>
-				<ToastProvider>{children}</ToastProvider>
-			</body>
+			<body>{children}</body>
 		</html>
 	);
 }
