@@ -2,14 +2,14 @@
 'use client';
 
 import 'leaflet/dist/leaflet.css';
-import type { Icon } from 'leaflet'; // ← type-only import は SSR でも安全
+import type { Icon } from 'leaflet';
 import dynamic from 'next/dynamic';
 import type React from 'react';
 import { useEffect, useState } from 'react';
 import type { MapContainerProps, MarkerProps, TileLayerProps } from 'react-leaflet';
 import { useMapEvents } from 'react-leaflet';
 
-// ---- react-leaflet を動的 import（SSR 完全オフ）＋ props 型付け ----
+// ---- react-leaflet を動的 import（SSR完全オフ）＋ props 型付け ----
 const MapContainer = dynamic<MapContainerProps>(
 	() => import('react-leaflet').then((m) => m.MapContainer),
 	{ ssr: false },
@@ -70,7 +70,7 @@ export default function GeoPredictClient() {
 	const [loading, setLoading] = useState(false);
 	const [pred, setPred] = useState<PredictPayload | null>(null);
 	const [error, setError] = useState<string | null>(null);
-	const [markerIcon, setMarkerIcon] = useState<Icon | null>(null); // ← icon を state に保持
+	const [markerIcon, setMarkerIcon] = useState<Icon | null>(null); // ← アイコンは state で管理
 
 	// Leaflet はブラウザでのみ import。既定アイコンを作って state に格納
 	useEffect(() => {
