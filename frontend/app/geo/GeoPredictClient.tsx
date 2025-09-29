@@ -2,19 +2,26 @@
 'use client';
 
 import 'leaflet/dist/leaflet.css';
+import type { Icon } from 'leaflet'; // ← type-only import は SSR でも安全
 import dynamic from 'next/dynamic';
-import React, { useEffect, useState } from 'react';
-import type { MapContainerProps } from 'react-leaflet';
+import type React from 'react';
+import { useEffect, useState } from 'react';
+import type { MapContainerProps, MarkerProps, TileLayerProps } from 'react-leaflet';
 import { useMapEvents } from 'react-leaflet';
 
-// ---- react-leaflet は動的 import で SSR を完全オフ ----
-const MapContainer = dynamic(() => import('react-leaflet').then((m) => m.MapContainer), {
+// ---- react-leaflet を動的 import（SSR 完全オフ）＋ props 型付け ----
+const MapContainer = dynamic<MapContainerProps>(
+	() => import('react-leaflet').then((m) => m.MapContainer),
+	{ ssr: false },
+);
+const TileLayer = dynamic<TileLayerProps>(() => import('react-leaflet').then((m) => m.TileLayer), {
 	ssr: false,
 });
-const TileLayer = dynamic(() => import('react-leaflet').then((m) => m.TileLayer), { ssr: false });
-const Marker = dynamic(() => import('react-leaflet').then((m) => m.Marker), { ssr: false });
+const Marker = dynamic<MarkerProps>(() => import('react-leaflet').then((m) => m.Marker), {
+	ssr: false,
+});
 
-// ---- API base（環境変数は BACKEND_URL に統一） ----
+// ---- API base（末尾スラ削除）----
 const API_BASE = (process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://127.0.0.1:8000').replace(
 	/\/$/,
 	'',
@@ -56,20 +63,20 @@ function ClickPicker({ onPick }: { onPick: (lat: number, lon: number) => void })
 
 export default function GeoPredictClient() {
 	const [query, setQuery] = useState('');
-	const [lang, setLang] = useState('ja');
+	const [lang, setLang] = useState<'ja' | 'en'>('ja');
 	const [hits, setHits] = useState<GeocodeItem[]>([]);
 	const [center, setCenter] = useState<[number, number]>([35.6812, 139.7671]); // 東京駅
 	const [marker, setMarker] = useState<[number, number] | null>([35.6812, 139.7671]);
 	const [loading, setLoading] = useState(false);
 	const [pred, setPred] = useState<PredictPayload | null>(null);
 	const [error, setError] = useState<string | null>(null);
+	const [markerIcon, setMarkerIcon] = useState<Icon | null>(null); // ← icon を state に保持
 
-	// ✅ Leaflet はブラウザでのみ読み込む（トップレベル import は禁止）
-	//    既定アイコンの欠落を防ぐため、Marker の default icon を runtime で設定
+	// Leaflet はブラウザでのみ import。既定アイコンを作って state に格納
 	useEffect(() => {
 		(async () => {
 			const L = await import('leaflet');
-			const defaultIcon = L.icon({
+			const icon = L.icon({
 				iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
 				iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
 				shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
@@ -78,8 +85,7 @@ export default function GeoPredictClient() {
 				popupAnchor: [1, -34],
 				shadowSize: [41, 41],
 			});
-			// @ts-expect-error: runtime patch for default icon on client
-			L.Marker.prototype.options.icon = defaultIcon;
+			setMarkerIcon(icon);
 		})();
 	}, []);
 
@@ -149,15 +155,17 @@ export default function GeoPredictClient() {
 					className="flex-1 border rounded px-3 py-2"
 					placeholder="地名 / 駅名 / 住所（例: 東京駅）"
 					value={query}
-					onChange={(e) => setQuery(e.target.value)}
-					onKeyDown={(e) => {
+					onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)}
+					onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
 						if (e.key === 'Enter') void doGeocode(query);
 					}}
 				/>
 				<select
 					className="border rounded px-2 py-2"
 					value={lang}
-					onChange={(e) => setLang(e.target.value)}
+					onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+						setLang(e.target.value as 'ja' | 'en')
+					}
 					title="言語"
 				>
 					<option value="ja">日本語</option>
@@ -206,8 +214,7 @@ export default function GeoPredictClient() {
 						url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
 					/>
 					<ClickPicker onPick={handlePick} />
-					{/* runtime patch 済みなので icon を渡す必要はない */}
-					{marker && <Marker position={marker} />}
+					{marker && markerIcon && <Marker position={marker} icon={markerIcon} />}
 				</MapContainer>
 			</div>
 

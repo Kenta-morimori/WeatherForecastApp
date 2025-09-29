@@ -1,9 +1,10 @@
+# backend/app/api/geocode.py
 from __future__ import annotations
 
 import asyncio
 import os
 import time
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import httpx
 from fastapi import APIRouter, HTTPException, Query
@@ -32,7 +33,7 @@ _CACHE_MAX = int(os.getenv("GEOCODE_CACHE_MAX", "200"))
 _CACHE_TTL = float(os.getenv("GEOCODE_CACHE_TTL", "600"))  # 秒
 
 
-def _cache_get(key: str) -> Dict[str, Any] | None:
+def _cache_get(key: str) -> Optional[Dict[str, Any]]:
     v = _CACHE.get(key)
     if not v:
         return None
@@ -49,7 +50,7 @@ def _cache_get(key: str) -> Dict[str, Any] | None:
     except ValueError:
         pass
     _CACHE_ORDER.insert(0, key)
-    return v["data"]  # type: ignore[return-value]
+    return v["data"]  # dict
 
 
 def _cache_set(key: str, data: Dict[str, Any]) -> None:
@@ -65,6 +66,7 @@ def _cache_set(key: str, data: Dict[str, Any]) -> None:
 
 
 async def _respect_rate_limit() -> None:
+    """簡易グローバル QPS 制御"""
     global _last_call_ts
     async with _rate_lock:
         now = time.time()
@@ -75,13 +77,27 @@ async def _respect_rate_limit() -> None:
         _last_call_ts = time.time()
 
 
+def _to_float(x: Any) -> Optional[float]:
+    """Nominatimの値（str/int/float/Noneなど）を安全に float へ変換。失敗時は None。"""
+    if isinstance(x, (int, float)):
+        return float(x)
+    if isinstance(x, str):
+        try:
+            return float(x)
+        except ValueError:
+            return None
+    return None
+
+
 def _format_item(item: Dict[str, Any]) -> Dict[str, Any]:
-    # Nominatim JSON v2 の一部だけをフロント用に抽出
+    """Nominatim JSON v2 の一部だけをフロント用に抽出（型安全変換）"""
+    lat = _to_float(item.get("lat"))
+    lon = _to_float(item.get("lon"))
     return {
         "name": item.get("name") or item.get("display_name"),
         "display_name": item.get("display_name"),
-        "lat": float(item.get("lat")) if item.get("lat") is not None else None,
-        "lon": float(item.get("lon")) if item.get("lon") is not None else None,
+        "lat": lat,
+        "lon": lon,
         "class": item.get("class"),
         "type": item.get("type"),
         "importance": item.get("importance"),
@@ -93,7 +109,7 @@ def _format_item(item: Dict[str, Any]) -> Dict[str, Any]:
 async def geocode_search(
     q: str = Query(..., min_length=2, description="地名／住所／ランドマーク（例: Tokyo Station）"),
     limit: int = Query(5, ge=1, le=10),
-    countrycodes: str | None = Query(None, description="JPなどISO 3166-1 Alpha-2をカンマ区切り"),
+    countrycodes: Optional[str] = Query(None, description="JPなどISO 3166-1 Alpha-2をカンマ区切り"),
     lang: str = Query("ja", description="言語（accept-language）"),
 ) -> Dict[str, Any]:
     """
@@ -106,7 +122,7 @@ async def geocode_search(
     if cached:
         return {"q": q, "source": "cache", "results": cached["results"]}
 
-    params = {
+    params: Dict[str, str] = {
         "q": q,
         "format": "jsonv2",
         "limit": str(limit),
@@ -122,6 +138,10 @@ async def geocode_search(
             resp = await client.get(f"{NOMINATIM_BASE}/search", params=params)
             resp.raise_for_status()
             data = resp.json()
+            if not isinstance(data, list):
+                raise HTTPException(status_code=502, detail="unexpected response from nominatim")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"geocoding upstream error: {e}")
 
@@ -154,6 +174,10 @@ async def geocode_reverse(
             resp = await client.get(f"{NOMINATIM_BASE}/reverse", params=params)
             resp.raise_for_status()
             data = resp.json()
+            if not isinstance(data, dict):
+                raise HTTPException(status_code=502, detail="unexpected response from nominatim")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"reverse geocoding upstream error: {e}")
 
