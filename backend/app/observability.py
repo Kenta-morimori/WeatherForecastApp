@@ -10,10 +10,15 @@ from contextvars import ContextVar, Token
 from statistics import median
 from typing import Any, Deque, Dict, List, Optional, Tuple, TypedDict
 
-# NOTE: requests に型スタブがない環境でも CI を通すための工夫
-#  - A案: dev 依存に types-requests を追加
-#  - B案: mypy.ini で requests.* を ignore_missing_imports にする
-import requests  # type: ignore[import-untyped]
+# --- requests を「オプション依存」にする ---
+try:
+    import requests  # type: ignore[import-untyped]
+
+    _REQUESTS_AVAILABLE = True
+except Exception:  # ModuleNotFoundError など
+    requests = None  # type: ignore[assignment]
+    _REQUESTS_AVAILABLE = False
+
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
@@ -82,7 +87,6 @@ class _PathMetrics:
 
 
 _METRICS: Dict[str, _PathMetrics] = defaultdict(_PathMetrics)
-
 # 旧コード互換のため公開名を用意
 METRICS = _METRICS
 
@@ -100,7 +104,11 @@ def metrics_dump() -> Dict[str, Any]:
             overall.lat_ms.append(v)
 
     by_path = {path: pm.snapshot() for path, pm in _METRICS.items()}
-    return {"overall": overall.snapshot(), "by_path": by_path}
+    return {
+        "overall": overall.snapshot(),
+        "by_path": by_path,
+        "instrumentation": {"requests": _REQUESTS_AVAILABLE},
+    }
 
 
 # =========
@@ -125,21 +133,28 @@ def log_json(payload: Dict[str, Any]) -> None:
 
 
 # =========
-# requests instrumentation (monkey-patch)
+# requests instrumentation (monkey-patch; optional)
 # =========
 def wrap_requests() -> None:
     """
     Wrap requests.Session.request to automatically record external API calls.
+    requests が無い環境では no-op。
     """
-    if getattr(requests.Session.request, "_wrapped_by_observability", False):
+    if not _REQUESTS_AVAILABLE:
+        return
+
+    # mypy: 型スタブが無い環境でもここは実行時ガード済み
+    assert requests is not None  # noqa: S101
+
+    if getattr(requests.Session.request, "_wrapped_by_observability", False):  # type: ignore[attr-defined]
         return  # already wrapped
 
-    _orig = requests.Session.request
+    _orig = requests.Session.request  # type: ignore[assignment]
 
-    def _wrapped(self, method, url, *args, **kwargs):
+    def _wrapped(self, method, url, *args, **kwargs):  # type: ignore[no-untyped-def]
         t0 = time.perf_counter()
         rec: ExtCall = {
-            "method": method,
+            "method": str(method),
             "url": str(url),
             "status": None,
             "ok": None,
@@ -148,7 +163,8 @@ def wrap_requests() -> None:
         }
         try:
             resp = _orig(self, method, url, *args, **kwargs)  # type: ignore[misc]
-            rec["status"] = getattr(resp, "status_code", None)
+            status_code = getattr(resp, "status_code", None)
+            rec["status"] = int(status_code) if status_code is not None else None
             rec["ok"] = bool(200 <= int(rec["status"] or 0) < 400)
             return resp
         except Exception as e:  # noqa: BLE001
@@ -183,7 +199,6 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
         rid = str(uuid.uuid4())
-        # 旧コード互換を意識しつつ直接セット
         request_id_ctx.set(rid)
         ext_api_calls_ctx.set([])
 
@@ -224,6 +239,7 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
                     "ext_api_calls_count": len(ext_calls),
                     "ext_api_calls": ext_calls,
                     "error": exc_text,
+                    "instrumentation": {"requests": _REQUESTS_AVAILABLE},
                 }
             )
 
