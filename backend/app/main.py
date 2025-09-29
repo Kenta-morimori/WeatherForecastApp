@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .observability import ObservabilityMiddleware, metrics_dump, wrap_requests
+from .middleware_observability import ObservabilityMiddleware, metrics_dump, wrap_requests
 
 # ===== FastAPI app =====
 app = FastAPI(title="WeatherForecastApp API")

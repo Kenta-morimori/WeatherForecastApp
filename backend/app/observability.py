@@ -6,20 +6,37 @@ import time
 import traceback
 import uuid
 from collections import defaultdict, deque
-from contextvars import ContextVar
+from contextvars import ContextVar, Token
 from statistics import median
-from typing import Any, Deque, Dict, List
+from typing import Any, Deque, Dict, List, Optional, Tuple, TypedDict
 
-import requests
+# NOTE: requests に型スタブがない環境でも CI を通すための工夫
+#  - A案: dev 依存に types-requests を追加
+#  - B案: mypy.ini で requests.* を ignore_missing_imports にする
+import requests  # type: ignore[import-untyped]
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
+
 # =========
-# Contexts
+# 型定義
 # =========
-request_id_ctx: ContextVar[str | None] = ContextVar("request_id", default=None)
-ext_api_calls_ctx: ContextVar[List[Dict[str, Any]]] = ContextVar("ext_api_calls", default=[])
+class ExtCall(TypedDict, total=False):
+    method: str
+    url: str
+    status: Optional[int]
+    ok: Optional[bool]
+    duration_ms: Optional[int]
+    error: Optional[str]
+
+
+# =========
+# Context
+# =========
+request_id_ctx: ContextVar[Optional[str]] = ContextVar("request_id", default=None)
+ext_api_calls_ctx: ContextVar[List[ExtCall]] = ContextVar("ext_api_calls", default=[])
+
 
 # =========
 # Metrics (in-memory / lightweight)
@@ -46,7 +63,7 @@ class _PathMetrics:
         arr_sorted = sorted(arr)
         n = len(arr_sorted)
 
-        def _pct(p: float) -> float | None:
+        def _pct(p: float) -> Optional[float]:
             if n == 0:
                 return None
             idx = max(0, min(n - 1, int(round((p / 100.0) * (n - 1)))))
@@ -66,6 +83,9 @@ class _PathMetrics:
 
 _METRICS: Dict[str, _PathMetrics] = defaultdict(_PathMetrics)
 
+# 旧コード互換のため公開名を用意
+METRICS = _METRICS
+
 
 def metrics_update(path: str, latency_ms: int, ok: bool) -> None:
     _METRICS[path].record(latency_ms, ok)
@@ -74,7 +94,6 @@ def metrics_update(path: str, latency_ms: int, ok: bool) -> None:
 def metrics_dump() -> Dict[str, Any]:
     overall = _PathMetrics()
     for pm in _METRICS.values():
-        # 合成（近似）
         overall.req += pm.req
         overall.fail += pm.fail
         for v in pm.lat_ms:
@@ -91,7 +110,7 @@ def _setup_logger() -> logging.Logger:
     logger = logging.getLogger("observability")
     if not logger.handlers:
         handler = logging.StreamHandler()
-        formatter = logging.Formatter(fmt="%(message)s")  # we emit JSON strings
+        formatter = logging.Formatter(fmt="%(message)s")  # emit JSON strings
         handler.setFormatter(formatter)
         logger.addHandler(handler)
     logger.setLevel(logging.INFO)
@@ -102,7 +121,6 @@ LOGGER = _setup_logger()
 
 
 def log_json(payload: Dict[str, Any]) -> None:
-    # ensure_ascii=False で日本語も可読化
     LOGGER.info(json.dumps(payload, ensure_ascii=False))
 
 
@@ -120,18 +138,18 @@ def wrap_requests() -> None:
 
     def _wrapped(self, method, url, *args, **kwargs):
         t0 = time.perf_counter()
-        rec = {
+        rec: ExtCall = {
             "method": method,
-            "url": url,
+            "url": str(url),
             "status": None,
             "ok": None,
             "duration_ms": None,
             "error": None,
         }
         try:
-            resp = _orig(self, method, url, *args, **kwargs)
-            rec["status"] = resp.status_code
-            rec["ok"] = bool(200 <= resp.status_code < 400)
+            resp = _orig(self, method, url, *args, **kwargs)  # type: ignore[misc]
+            rec["status"] = getattr(resp, "status_code", None)
+            rec["ok"] = bool(200 <= int(rec["status"] or 0) < 400)
             return resp
         except Exception as e:  # noqa: BLE001
             rec["ok"] = False
@@ -141,15 +159,13 @@ def wrap_requests() -> None:
             rec["duration_ms"] = int((time.perf_counter() - t0) * 1000)
             try:
                 lst = ext_api_calls_ctx.get()
-                # copy-on-write to avoid cross-request contamination
-                new = list(lst)
+                new = list(lst)  # copy-on-write
                 new.append(rec)
                 ext_api_calls_ctx.set(new)
             except LookupError:
-                # not within request context
                 pass
 
-    _wrapped._wrapped_by_observability = True  # type: ignore[attr-defined]
+    setattr(_wrapped, "_wrapped_by_observability", True)  # flag for idempotency
     requests.Session.request = _wrapped  # type: ignore[assignment]
 
 
@@ -165,19 +181,18 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
     - 1 リクエスト = 1 ログ（追跡容易）
     """
 
-    def __init__(self, app):
-        super().__init__(app)
-
     async def dispatch(self, request: Request, call_next):
         rid = str(uuid.uuid4())
+        # 旧コード互換を意識しつつ直接セット
         request_id_ctx.set(rid)
         ext_api_calls_ctx.set([])
 
         t0 = time.perf_counter()
         status = 500
-        exc_text = None
+        exc_text: Optional[str] = None
+        response: Optional[Response] = None
         try:
-            response: Response = await call_next(request)
+            response = await call_next(request)
             status = response.status_code
             return response
         except Exception:
@@ -185,19 +200,17 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
             raise
         finally:
             latency_ms = int((time.perf_counter() - t0) * 1000)
-            ext_calls = ext_api_calls_ctx.get()
+            ext_calls = get_ext_calls()
             ok = 200 <= status < 400
             metrics_update(request.url.path, latency_ms, ok)
 
-            # レスポンスヘッダ（追跡用）
-            try:
-                # レスポンスオブジェクトがある場合のみ付与
-                response.headers["X-Request-ID"] = rid  # type: ignore[index]
-                response.headers["Server-Timing"] = f"app;dur={latency_ms}"  # type: ignore[index]
-            except Exception:
-                pass
+            if response is not None:
+                try:
+                    response.headers["X-Request-ID"] = rid
+                    response.headers["Server-Timing"] = f"app;dur={latency_ms}"
+                except Exception:
+                    pass
 
-            # 1 リクエスト = 1 行の JSON ログ
             log_json(
                 {
                     "type": "request_summary",
@@ -209,7 +222,31 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
                     "status": status,
                     "latency_ms": latency_ms,
                     "ext_api_calls_count": len(ext_calls),
-                    "ext_api_calls": ext_calls,  # URL/ステータス/所要時間
+                    "ext_api_calls": ext_calls,
                     "error": exc_text,
                 }
             )
+
+
+# =========
+# 旧コード互換 API
+# =========
+def get_ext_calls() -> List[ExtCall]:
+    """現在のリクエストで記録済みの外部呼び出し一覧を返す（無ければ空リスト）。"""
+    try:
+        return list(ext_api_calls_ctx.get())
+    except LookupError:
+        return []
+
+
+def new_request_context(
+    rid: Optional[str] = None,
+) -> Tuple[str, Token[Optional[str]], Token[List[ExtCall]]]:
+    """
+    旧コードが explicit にコンテキストを張りたいときのヘルパ。
+    ミドルウェア未使用の同期バッチなどから利用可能。
+    """
+    assigned = rid or str(uuid.uuid4())
+    t1 = request_id_ctx.set(assigned)
+    t2 = ext_api_calls_ctx.set([])
+    return assigned, t1, t2
