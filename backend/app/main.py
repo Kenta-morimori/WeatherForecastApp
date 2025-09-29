@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .middleware_observability import ObservabilityMiddleware, metrics_dump, wrap_requests
 from .api.routes import router as api_router  # /predict, /forecast を提供
+from .middleware_observability import ObservabilityMiddleware, metrics_dump, wrap_requests
 
 app = FastAPI(title="WeatherForecastApp API")
 
@@ -27,9 +28,11 @@ app.add_middleware(ObservabilityMiddleware)
 # ルーター配線（ここが無いと /predict が 404）
 app.include_router(api_router)
 
+
 @app.get("/api/health")
 def health() -> dict:
     return {"status": "ok"}
+
 
 @app.get("/api/metrics-lite")
 def metrics_lite() -> JSONResponse:
