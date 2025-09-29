@@ -128,6 +128,75 @@ pnpm -C frontend typecheck
 > ※ モノレポ最適化をする場合は `vercel.json` の `ignoreCommand` で
 > 「`frontend/` に差分がない PR はスキップ」などのチューニングが可能です。
 
+## 📈 運用可観測性（MVP）
+
+本 API は **1 リクエスト＝1 行の JSON 構造化ログ** を出力します（`request_id`, `latency_ms`, `ext_api_calls` を含む）。
+また、**簡易メトリクス** を `/api/metrics-lite` で確認できます。
+
+- **DoD**
+  - ログ 1 行でリクエストの辿り（`request_id`）が可能
+  - 簡易 SLO を明記：**p95 < 800 ms**
+    - `/api/metrics-lite` の `overall.p95_ms` が 800 未満であること
+
+### 例：確認コマンド
+
+```bash
+# ヘルス
+curl -i http://127.0.0.1:8000/api/health
+
+# メトリクス（jq で p95 を確認）
+curl -s http://127.0.0.1:8000/api/metrics-lite | jq .overall.p95_ms
+```
+
+構造化ログの項目
+- request_id: 追跡用 UUID（レスポンスヘッダ X-Request-ID にも付与）
+- status: ステータスコード
+- latency_ms: リクエスト全体のレイテンシ
+- ext_api_calls: アプリ中で発生した外部 API 呼び出し一覧（method,url,status,duration_ms,error）
+
+
+---
+
+# 使い方・挙動
+
+- **外部 API の自動計測**
+  アプリ起動時に `wrap_requests()` が `requests` をモンキーパッチするため、既存コードで `requests.get/post/...` を使っていれば、**追加変更なしで** `ext_api_calls` に計測が載ります。
+
+- **1 リクエスト = 1 ログ**
+  `ObservabilityMiddleware` がレイテンシ計測と `request_id` 付与を行い、**最後に 1 行の JSON ログ**を出力します。
+  （ログ出力は `stdout`。Render/ Railway/ Koyeb でも収集しやすい形式）
+
+- **簡易メトリクス**
+  ルート（`path`）ごとに過去最大 1000 件のレイテンシを保持し、`p50/p95/p99` と `failure_rate` を計算して `/api/metrics-lite` で返します。
+  本格運用では Prometheus + Grafana 等へ置き換え想定の**簡易版**です。
+
+---
+
+# 動作確認（ローカル）
+
+```bash
+# 起動（例）
+uvx uvicorn backend.app.main:app --reload --port 8000
+
+# 疑似トラフィックを流してメトリクス確認
+for i in $(seq 1 20); do curl -s 'http://127.0.0.1:8000/api/health' > /dev/null; done
+curl -s 'http://127.0.0.1:8000/api/metrics-lite' | jq .
+ログ例（1 行／1 リクエスト）:
+
+```json
+コードをコピーする
+{
+  "type":"request_summary",
+  "request_id":"b2f5c2c3-...-8a27",
+  "method":"GET",
+  "path":"/api/health",
+  "status":200,
+  "latency_ms":3,
+  "ext_api_calls_count":0,
+  "ext_api_calls":[]
+}
+```
+
 ---
 
 ## 🔌 バックエンドをつなぐ時（任意）
