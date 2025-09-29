@@ -1,30 +1,24 @@
+// frontend/app/geo/GeoPredictClient.tsx
 'use client';
 
-import L from 'leaflet';
-import dynamic from 'next/dynamic';
-import React, { useState } from 'react';
-import type { MapContainerProps } from 'react-leaflet';
-import { Marker as MarkerBase, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import dynamic from 'next/dynamic';
+import React, { useEffect, useState } from 'react';
+import type { MapContainerProps } from 'react-leaflet';
+import { useMapEvents } from 'react-leaflet';
 
-// Leaflet のアイコンは Marker に直接渡す（prototype 書き換え回避）
-const DefaultIcon = L.icon({
-	iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-	iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-	shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-	iconSize: [25, 41],
-	iconAnchor: [12, 41],
-});
-
-// SSR を切ったコンポーネント（Map/Tile/Marker）
+// ---- react-leaflet は動的 import で SSR を完全オフ ----
 const MapContainer = dynamic(() => import('react-leaflet').then((m) => m.MapContainer), {
 	ssr: false,
 });
 const TileLayer = dynamic(() => import('react-leaflet').then((m) => m.TileLayer), { ssr: false });
 const Marker = dynamic(() => import('react-leaflet').then((m) => m.Marker), { ssr: false });
 
-// API base
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? '';
+// ---- API base（環境変数は BACKEND_URL に統一） ----
+const API_BASE = (process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://127.0.0.1:8000').replace(
+	/\/$/,
+	'',
+);
 
 type GeocodeItem = {
 	name?: string | null;
@@ -70,6 +64,25 @@ export default function GeoPredictClient() {
 	const [pred, setPred] = useState<PredictPayload | null>(null);
 	const [error, setError] = useState<string | null>(null);
 
+	// ✅ Leaflet はブラウザでのみ読み込む（トップレベル import は禁止）
+	//    既定アイコンの欠落を防ぐため、Marker の default icon を runtime で設定
+	useEffect(() => {
+		(async () => {
+			const L = await import('leaflet');
+			const defaultIcon = L.icon({
+				iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+				iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+				shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+				iconSize: [25, 41],
+				iconAnchor: [12, 41],
+				popupAnchor: [1, -34],
+				shadowSize: [41, 41],
+			});
+			// @ts-expect-error: runtime patch for default icon on client
+			L.Marker.prototype.options.icon = defaultIcon;
+		})();
+	}, []);
+
 	const toMessage = (e: unknown) =>
 		e instanceof Error ? e.message : typeof e === 'string' ? e : 'unknown error';
 
@@ -80,8 +93,13 @@ export default function GeoPredictClient() {
 			return;
 		}
 		try {
-			const url = `${API_BASE}/api/geocode/search?q=${encodeURIComponent(q)}&limit=5&lang=${lang}&countrycodes=jp`;
-			const res = await fetch(url);
+			const params = new URLSearchParams({
+				q,
+				limit: String(5),
+				lang,
+				countrycodes: 'jp',
+			});
+			const res = await fetch(`${API_BASE}/api/geocode/search?${params.toString()}`);
 			if (!res.ok) throw new Error(await res.text());
 			const data = (await res.json()) as GeocodeSearchResponse;
 			const results = Array.isArray(data.results)
@@ -188,7 +206,8 @@ export default function GeoPredictClient() {
 						url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
 					/>
 					<ClickPicker onPick={handlePick} />
-					{marker && <Marker position={marker} icon={DefaultIcon} />}
+					{/* runtime patch 済みなので icon を渡す必要はない */}
+					{marker && <Marker position={marker} />}
 				</MapContainer>
 			</div>
 
