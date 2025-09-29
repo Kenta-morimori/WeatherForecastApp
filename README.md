@@ -215,6 +215,18 @@ curl -s 'http://127.0.0.1:8000/api/metrics-lite' | jq .
 * [ ] 入力バリデーション拡充・エラーメッセージ整備
 * [ ] E2E テスト / モバイル最適化の微調整
 
+## 地名検索 / 地図ピッカー（規約・レート）
+
+- 本アプリのジオコーディングは既定で **Nominatim (OpenStreetMap)** を使用します。
+- **遵守事項**：
+  - 1 リクエスト/秒以下（アプリ内でスロットルしています）
+  - 連絡先を含む **識別可能な User-Agent** を送信（`NOMINATIM_UA` 環境変数）
+  - 大量アクセス/商用は **自前Nominatim** か **Mapbox/Google 等の商用API**利用を検討
+  - 地図タイルには OSM の帰属表記（Attribution）を表示
+- **環境変数**
+  - `NEXT_PUBLIC_API_BASE`（フロント→バックのベースURL）
+  - `NOMINATIM_BASE` / `NOMINATIM_UA` / `NOMINATIM_QPS` / `GEOCODE_CACHE_MAX` / `GEOCODE_CACHE_TTL`
+
 ---
 
 ## 👥 貢献

@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from .api.geocode import router as geocode_router
 from .api.routes import router as api_router  # /predict, /forecast を提供
 from .middleware_observability import ObservabilityMiddleware, metrics_dump, wrap_requests
 
@@ -27,6 +28,7 @@ app.add_middleware(ObservabilityMiddleware)
 
 # ルーター配線（ここが無いと /predict が 404）
 app.include_router(api_router)
+app.include_router(geocode_router, prefix="/api")
 
 
 @app.get("/api/health")
