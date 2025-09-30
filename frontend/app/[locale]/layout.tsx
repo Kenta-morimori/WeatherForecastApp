@@ -10,17 +10,22 @@ export const metadata: Metadata = {
 	description: 'Search a place & get forecast powered by AI',
 };
 
-export default function LocaleLayout({
+export default async function LocaleLayout({
 	children,
 	params,
 }: {
 	children: React.ReactNode;
-	params: { locale: 'ja' | 'en' };
+	// Next.js 15 の型に合わせて Promise を受け取る
+	params: Promise<{ locale: string }>;
 }) {
-	const i18n = ensureI18n(params.locale);
+	const { locale } = await params;
+
+	// 受け取った locale を 'ja' | 'en' に正規化（想定外は 'ja' にフォールバック）
+	const normalized = (locale === 'en' ? 'en' : 'ja') as 'ja' | 'en';
+	const i18n = ensureI18n(normalized);
 
 	return (
-		<html lang={params.locale} className="h-full">
+		<html lang={normalized} className="h-full">
 			<body className="min-h-screen bg-[radial-gradient(ellipse_at_top,rgba(99,102,241,0.10),transparent_50%),linear-gradient(to_bottom,white,white)] text-zinc-800 antialiased dark:bg-zinc-950 dark:text-zinc-100">
 				{/* Skip link */}
 				<a
@@ -35,7 +40,7 @@ export default function LocaleLayout({
 						<div className="mx-auto max-w-3xl px-6 py-3 flex items-center justify-between">
 							<div className="text-lg font-semibold tracking-tight">WeatherForecastApp</div>
 							<nav aria-label="Global" className="flex items-center gap-3">
-								<LanguageToggle locale={params.locale} />
+								<LanguageToggle locale={normalized} />
 							</nav>
 						</div>
 					</header>
