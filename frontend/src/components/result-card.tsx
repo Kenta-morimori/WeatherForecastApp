@@ -1,5 +1,6 @@
 'use client';
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 export type DayBlock = {
 	max?: number | null;
@@ -33,26 +34,28 @@ function toPct(x: number | null | undefined) {
 }
 
 export function ResultCard(props: Props) {
+	const { t } = useTranslation('common');
+
 	if ('locationLabel' in props) {
 		const { locationLabel, tempMean, tempMin, tempMax, precipMm } = props;
 		return (
 			<div className="w-full rounded-2xl border p-4 shadow">
-				<div className="mb-2 text-sm text-gray-500">{locationLabel}</div>
+				<div className="mb-2 text-sm text-zinc-500">{locationLabel}</div>
 				<div className="grid grid-cols-2 gap-4 text-sm sm:text-base">
-					<div className="rounded-2xl bg-gray-100 p-3">
-						<div className="opacity-70">最高</div>
+					<div className="rounded-2xl bg-zinc-100 p-3 dark:bg-zinc-800/60">
+						<div className="opacity-70">{t('label_max') ?? '最高'}</div>
 						<div className="text-2xl font-semibold">{fmt(tempMax)}℃</div>
 					</div>
-					<div className="rounded-2xl bg-gray-100 p-3">
-						<div className="opacity-70">最低</div>
+					<div className="rounded-2xl bg-zinc-100 p-3 dark:bg-zinc-800/60">
+						<div className="opacity-70">{t('label_min') ?? '最低'}</div>
 						<div className="text-2xl font-semibold">{fmt(tempMin)}℃</div>
 					</div>
-					<div className="rounded-2xl bg-gray-100 p-3">
-						<div className="opacity-70">平均</div>
+					<div className="rounded-2xl bg-zinc-100 p-3 dark:bg-zinc-800/60">
+						<div className="opacity-70">{t('label_mean') ?? '平均'}</div>
 						<div className="text-2xl font-semibold">{fmt(tempMean)}℃</div>
 					</div>
-					<div className="rounded-2xl bg-gray-100 p-3">
-						<div className="opacity-70">降水量</div>
+					<div className="rounded-2xl bg-zinc-100 p-3 dark:bg-zinc-800/60">
+						<div className="opacity-70">{t('label_precip') ?? '降水量'}</div>
 						<div className="text-2xl font-semibold">{fmt(precipMm, 1)} mm</div>
 					</div>
 				</div>
@@ -65,20 +68,20 @@ export function ResultCard(props: Props) {
 		<div className="w-full rounded-2xl border p-4 shadow">
 			{title && <div className="mb-2 text-xl">{title}</div>}
 			<div className="grid grid-cols-2 gap-4 text-sm sm:text-base">
-				<div className="rounded-2xl bg-gray-100 p-3">
-					<div className="opacity-70">最高</div>
+				<div className="rounded-2xl bg-zinc-100 p-3 dark:bg-zinc-800/60">
+					<div className="opacity-70">{t('label_max') ?? '最高'}</div>
 					<div className="text-2xl font-semibold">{fmt(data?.max)}℃</div>
 				</div>
-				<div className="rounded-2xl bg-gray-100 p-3">
-					<div className="opacity-70">最低</div>
+				<div className="rounded-2xl bg-zinc-100 p-3 dark:bg-zinc-800/60">
+					<div className="opacity-70">{t('label_min') ?? '最低'}</div>
 					<div className="text-2xl font-semibold">{fmt(data?.min)}℃</div>
 				</div>
-				<div className="rounded-2xl bg-gray-100 p-3">
-					<div className="opacity-70">降水確率</div>
+				<div className="rounded-2xl bg-zinc-100 p-3 dark:bg-zinc-800/60">
+					<div className="opacity-70">{t('label_precip_prob') ?? '降水確率'}</div>
 					<div className="text-2xl font-semibold">{toPct(data?.precip_prob)}</div>
 				</div>
-				<div className="rounded-2xl bg-gray-100 p-3">
-					<div className="opacity-70">降水量</div>
+				<div className="rounded-2xl bg-zinc-100 p-3 dark:bg-zinc-800/60">
+					<div className="opacity-70">{t('label_precip') ?? '降水量'}</div>
 					<div className="text-2xl font-semibold">{fmt(data?.precip, 1)} mm</div>
 				</div>
 			</div>

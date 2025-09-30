@@ -5,7 +5,8 @@ import 'leaflet/dist/leaflet.css';
 import type { Icon } from 'leaflet';
 import dynamic from 'next/dynamic';
 import type React from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { MapContainerProps, MarkerProps, TileLayerProps } from 'react-leaflet';
 import { useMapEvents } from 'react-leaflet';
 
@@ -62,8 +63,16 @@ function ClickPicker({ onPick }: { onPick: (lat: number, lon: number) => void })
 }
 
 export default function GeoPredict() {
+	const { t, i18n } = useTranslation('common');
+
 	const [query, setQuery] = useState('');
-	const [lang, setLang] = useState<'ja' | 'en'>('ja');
+	// i18n.language を反映（サブパスが /ja|/en なので先頭2文字で推定）
+	const routeLang = useMemo(
+		() => (i18n.language?.startsWith('en') ? 'en' : 'ja') as 'ja' | 'en',
+		[i18n.language],
+	);
+	const [lang, setLang] = useState<'ja' | 'en'>(routeLang);
+
 	const [hits, setHits] = useState<GeocodeItem[]>([]);
 	const [center, setCenter] = useState<[number, number]>([35.6812, 139.7671]);
 	const [marker, setMarker] = useState<[number, number] | null>([35.6812, 139.7671]);
@@ -115,7 +124,7 @@ export default function GeoPredict() {
 				: [];
 			setHits(results);
 		} catch (e) {
-			setError(`Geocode error: ${toMessage(e)}`);
+			setError(`${t('error_fetch')}: ${toMessage(e)}`);
 			setHits([]);
 		}
 	}
@@ -134,7 +143,7 @@ export default function GeoPredict() {
 			const data = (await res.json()) as PredictPayload;
 			setPred(data);
 		} catch (e) {
-			setError(`Predict error: ${toMessage(e)}`);
+			setError(`${t('error_fetch')}: ${toMessage(e)}`);
 		} finally {
 			setLoading(false);
 		}
@@ -146,103 +155,162 @@ export default function GeoPredict() {
 		void doPredict(lat, lon);
 	}
 
+	const inputId = 'geocode-input';
+	const langId = 'lang-select';
+	const selectId = 'geocode-results';
+
 	return (
 		<div className="w-full max-w-4xl mx-auto grid gap-4 p-4">
-			<h2 className="text-xl font-semibold">場所を検索して予測</h2>
+			<h2 className="text-xl md:text-2xl font-semibold tracking-tight">{t('title_geo')}</h2>
 
-			<div className="flex gap-2 items-center">
-				<input
-					className="flex-1 border rounded px-3 py-2"
-					placeholder="地名 / 駅名 / 住所（例: 東京駅）"
-					value={query}
-					onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)}
-					onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
-						if (e.key === 'Enter') void doGeocode(query);
-					}}
-				/>
-				<select
-					className="border rounded px-2 py-2"
-					value={lang}
-					onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-						setLang(e.target.value as 'ja' | 'en')
-					}
-					title="言語"
-				>
-					<option value="ja">日本語</option>
-					<option value="en">English</option>
-				</select>
+			{/* 入力：label/aria を追加 */}
+			<div className="flex gap-2 items-end">
+				<div className="flex-1">
+					<label
+						htmlFor={inputId}
+						className="block text-sm font-medium text-zinc-700 dark:text-zinc-200"
+					>
+						{t('search_label')}
+					</label>
+					<input
+						id={inputId}
+						className="mt-1 w-full border rounded-lg px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+						placeholder={t('placeholder_search')}
+						value={query}
+						onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)}
+						onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+							if (e.key === 'Enter') void doGeocode(query);
+						}}
+					/>
+				</div>
+
+				<div>
+					<label
+						htmlFor={langId}
+						className="block text-sm font-medium text-zinc-700 dark:text-zinc-200"
+					>
+						{t('label_language')}
+					</label>
+					<select
+						id={langId}
+						className="mt-1 border rounded-lg px-2 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+						value={lang}
+						onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+							setLang(e.target.value as 'ja' | 'en')
+						}
+						title={t('label_language')}
+						aria-label={t('label_language')}
+					>
+						<option value="ja">日本語</option>
+						<option value="en">English</option>
+					</select>
+				</div>
+
 				<button
 					type="button"
-					className="border rounded px-3 py-2 hover:bg-gray-50"
+					className="inline-flex items-center rounded-lg px-4 py-2 bg-indigo-600 text-white hover:bg-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
 					onClick={() => void doGeocode(query)}
 				>
-					検索
+					{t('btn_search')}
 				</button>
 			</div>
 
+			{/* 検索ヒット：ネイティブ <select> に変更（Biomeの useSemanticElements を満たす） */}
 			{hits.length > 0 && (
-				<div className="border rounded p-2 max-h-48 overflow-auto">
-					{hits.map((h) => {
-						const key = `${h.lat.toFixed(5)},${h.lon.toFixed(5)}`;
-						return (
-							<button
-								type="button"
-								key={key}
-								className="block text-left w-full px-2 py-1 hover:bg-gray-50"
-								onClick={() => handlePick(h.lat, h.lon)}
-								title={h.display_name ?? h.name ?? ''}
-							>
-								<div className="text-sm font-medium">{h.name ?? h.display_name}</div>
-								<div className="text-xs text-gray-500">
-									{h.lat.toFixed(5)}, {h.lon.toFixed(5)}
-								</div>
-							</button>
-						);
-					})}
+				<div className="border rounded-xl p-3">
+					<label
+						htmlFor={selectId}
+						className="block text-sm font-medium text-zinc-700 dark:text-zinc-200 mb-1"
+					>
+						{t('search_label')}
+					</label>
+					<select
+						id={selectId}
+						size={Math.min(hits.length, 5)}
+						className="w-full border rounded-lg px-2 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+						onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+							const idx = e.target.selectedIndex;
+							const item = hits[idx];
+							if (item) handlePick(item.lat, item.lon);
+						}}
+						aria-describedby="geocode-hint"
+					>
+						{hits.map((h) => {
+							const label = (h.name ?? h.display_name ?? '').trim();
+							const coords = `${h.lat.toFixed(5)}, ${h.lon.toFixed(5)}`;
+							return (
+								<option
+									key={`${h.lat}-${h.lon}`}
+									value={coords}
+									title={label ? `${label} (${coords})` : coords}
+								>
+									{label ? `${label} — ${coords}` : coords}
+								</option>
+							);
+						})}
+					</select>
+					<p id="geocode-hint" className="mt-1 text-xs text-zinc-500">
+						Enter で選択、Tab で移動できます。
+					</p>
 				</div>
 			)}
 
-			<div className="h-[420px] w-full rounded overflow-hidden border">
-				<MapContainer
-					center={center}
-					zoom={11}
-					scrollWheelZoom
-					style={{ height: '100%', width: '100%' } as MapContainerProps['style']}
-				>
-					<TileLayer
-						attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-						url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-					/>
-					<ClickPicker onPick={handlePick} />
-					{marker && markerIcon && <Marker position={marker} icon={markerIcon} />}
-				</MapContainer>
-			</div>
+			{/* 地図エリア（セマンティック + 枠装飾） */}
+			<section
+				aria-labelledby="map-heading"
+				aria-describedby="map-help"
+				className="rounded-2xl overflow-hidden border border-zinc-200/60 dark:border-zinc-800/60 shadow-[0_1px_24px_-8px_rgba(0,0,0,0.25)]"
+			>
+				<h3 id="map-heading" className="sr-only">
+					{t('map_label')}
+				</h3>
+				<div className="h-[420px] w-full">
+					<MapContainer
+						center={center}
+						zoom={11}
+						scrollWheelZoom
+						style={{ height: '100%', width: '100%' } as MapContainerProps['style']}
+					>
+						<TileLayer
+							attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+							url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+						/>
+						<ClickPicker onPick={handlePick} />
+						{marker && markerIcon && <Marker position={marker} icon={markerIcon} />}
+					</MapContainer>
+				</div>
+			</section>
 
-			<div className="grid gap-2">
-				{loading && <div className="text-sm">予測取得中…</div>}
+			<p id="map-help" className="text-sm text-zinc-500 dark:text-zinc-400">
+				{t('hint_start')}
+			</p>
+
+			{/* 通知エリアは live 領域に */}
+			<div className="grid gap-2" aria-live="polite">
+				{loading && <div className="text-sm">{t('loading_predict')}</div>}
 				{error && <div className="text-sm text-red-600">{error}</div>}
-				{pred && (
-					<div className="border rounded p-3">
-						<div className="text-sm text-gray-500 mb-1">
-							backend: {pred.backend} / D0: {pred.date_d0} / D1: {pred.date_d1}
+
+				{pred ? (
+					<div className="rounded-2xl border border-zinc-200/60 dark:border-zinc-800/60 p-4 bg-white/70 dark:bg-zinc-900/50">
+						<div className="text-sm text-zinc-500 mb-1">
+							backend: {pred.backend} / {t('today')}: {pred.date_d0} / {t('tomorrow')}:{' '}
+							{pred.date_d1}
 						</div>
 						<div className="text-lg">
-							明日の予測: 平均 {pred.prediction.d1_mean.toFixed(1)}℃（最低{' '}
-							{pred.prediction.d1_min.toFixed(1)}℃ / 最高 {pred.prediction.d1_max.toFixed(1)}
-							℃）・降水 {pred.prediction.d1_prec.toFixed(1)}mm
+							{t('pred_tomorrow', {
+								mean: pred.prediction.d1_mean.toFixed(1),
+								min: pred.prediction.d1_min.toFixed(1),
+								max: pred.prediction.d1_max.toFixed(1),
+								prec: pred.prediction.d1_prec.toFixed(1),
+							})}
 						</div>
 					</div>
-				)}
-				{!pred && !loading && (
-					<div className="text-sm text-gray-500">
-						地図をクリック、または検索結果を選ぶと予測を表示します。
-					</div>
+				) : (
+					!loading && <div className="text-sm text-zinc-500">{t('hint_start')}</div>
 				)}
 			</div>
 
-			<div className="text-xs text-gray-500 mt-2">
-				地図タイル: © OpenStreetMap contributors（利用規約とレートを遵守）
-			</div>
+			<div className="text-xs text-zinc-500 mt-2">{t('osm_attribution')}</div>
 		</div>
 	);
 }
