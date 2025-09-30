@@ -1,8 +1,14 @@
 import type { Config } from 'tailwindcss';
 
 export default {
+	// ".dark" セレクタを明示的に使う運用ならこのままでOK
 	darkMode: ['class', '.dark'],
-	content: ['./src/**/*.{ts,tsx,js,jsx}'],
+	// ← ここを広げる（App Router & components を網羅）
+	content: [
+		'./app/**/*.{ts,tsx,js,jsx,mdx}',
+		'./src/**/*.{ts,tsx,js,jsx,mdx}',
+		'./components/**/*.{ts,tsx,js,jsx,mdx}',
+	],
 	theme: {
 		extend: {
 			colors: {

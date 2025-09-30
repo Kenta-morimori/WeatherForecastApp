@@ -1,13 +1,27 @@
-/* フォーカスリングの可視化を全体規約化（:focus-visible ベース） */
+/* Tailwind core */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 100% height */
+html,
+body,
+#__next {
+	height: 100%;
+}
+
+/* Focus ring (全体規約) */
 :root {
 	--ring: 2px;
-	--ring-color: rgb(99 102 241); /* indigo-500 相当 */
+	--ring-color: rgb(99 102 241);
 }
 *:focus-visible {
 	outline: none;
 	box-shadow: 0 0 0 var(--ring) var(--ring-color), 0 0 0 calc(var(--ring) + 2px)
 		rgba(255, 255, 255, 0.9);
 }
+
+/* motion reduce */
 @media (prefers-reduced-motion: reduce) {
 	* {
 		animation-duration: 0.001ms !important;

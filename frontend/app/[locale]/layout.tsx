@@ -20,7 +20,6 @@ export default async function LocaleLayout({
 
 	return (
 		<ClientI18nProvider locale={normalized}>
-			{/* Skip link */}
 			<a
 				href="#main"
 				className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:px-3 focus:py-2 focus:rounded-md focus:bg-white focus:text-zinc-900 focus:shadow-lg focus:ring-2 focus:ring-indigo-500 dark:focus:bg-zinc-900 dark:focus:text-white"
