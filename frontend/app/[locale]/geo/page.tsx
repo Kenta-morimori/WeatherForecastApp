@@ -13,14 +13,22 @@ export default function GeoPage() {
 		<div className="space-y-6">
 			<h1 className="text-2xl md:text-3xl font-semibold tracking-tight">{t('title_geo')}</h1>
 
-			<SearchForm
-				aria-label={t('search_label')}
-				placeholder={t('placeholder_search')}
-				// 既存の props に合わせて適宜差し込む
-				onSubmit={(payload) => {
-					/* 既存ロジック */
-				}}
-			/>
+			{/* SearchForm が受け取らない props（placeholder/aria-label）は渡さない */}
+			<div className="space-y-2">
+				<label
+					htmlFor="place-search"
+					className="block text-sm font-medium text-zinc-700 dark:text-zinc-200"
+				>
+					{t('search_label')}
+				</label>
+				<SearchForm
+					// 既存の props に合わせて適宜差し込む
+					onSubmit={(payload) => {
+						/* 既存ロジック */
+					}}
+					className="mt-1"
+				/>
+			</div>
 
 			{/* 地図領域をセマンティックな <section> として宣言 */}
 			<section

@@ -2,7 +2,7 @@
 import { ensureI18n } from '@/lib/i18n';
 import type { Metadata } from 'next';
 import { I18nextProvider } from 'react-i18next';
-import './globals.css';
+import '../globals.css';
 import { LanguageToggle } from '@/components/LanguageToggle';
 
 export const metadata: Metadata = {
