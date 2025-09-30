@@ -23,6 +23,9 @@ RUN chown -R appuser:appuser /app
 USER appuser
 RUN uv sync --project backend --no-dev --frozen
 
+ENV VIRTUAL_ENV=/app/backend/.venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
 # アプリ本体をコピー（.venv を壊さない）
 COPY --chown=appuser:appuser backend/ ./backend/
 
@@ -34,4 +37,4 @@ HEALTHCHECK CMD python -c "import urllib.request,os; \
     || exit 1
 
 # ランタイムは venv の uvicorn を直接叩く（余計な同期を発生させない）
-CMD ["sh", "-c", "exec backend/.venv/bin/uvicorn backend.app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "exec uvicorn backend.app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
