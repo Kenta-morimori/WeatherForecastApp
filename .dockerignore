@@ -15,3 +15,13 @@ build/
 *.joblib
 *.pt
 *.h5
+# env files（秘密情報）
+.env
+.env.*
+!frontend/.env.example
+!backend/.env.example
+
+# macOS, editor junk
+**/.DS_Store
+.idea/
+.vscode/
