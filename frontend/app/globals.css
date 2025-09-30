@@ -1,7 +1,5 @@
-/* Tailwind core */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Tailwind v4: 単一インポート */
+@import "tailwindcss";
 
 /* 100% height */
 html,

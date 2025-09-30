@@ -13,9 +13,7 @@ const resources = {
 
 let initialized = false;
 
-/**
- * i18n を一度だけ初期化して返す（言語切替はここでしない）
- */
+/** 一度だけ初期化。ここでは changeLanguage しない */
 export function getI18n() {
 	if (!initialized) {
 		i18n
