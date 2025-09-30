@@ -1,8 +1,7 @@
 // app/[locale]/layout.tsx
-import { ensureI18n } from '@/lib/i18n';
 import type { Metadata } from 'next';
-import { I18nextProvider } from 'react-i18next';
 import '../globals.css';
+import { ClientI18nProvider } from '@/components/ClientI18nProvider';
 import { LanguageToggle } from '@/components/LanguageToggle';
 
 export const metadata: Metadata = {
@@ -15,14 +14,10 @@ export default async function LocaleLayout({
 	params,
 }: {
 	children: React.ReactNode;
-	// Next.js 15 の型に合わせて Promise を受け取る
 	params: Promise<{ locale: string }>;
 }) {
 	const { locale } = await params;
-
-	// 受け取った locale を 'ja' | 'en' に正規化（想定外は 'ja' にフォールバック）
 	const normalized = (locale === 'en' ? 'en' : 'ja') as 'ja' | 'en';
-	const i18n = ensureI18n(normalized);
 
 	return (
 		<html lang={normalized} className="h-full">
@@ -35,7 +30,8 @@ export default async function LocaleLayout({
 					Skip to content
 				</a>
 
-				<I18nextProvider i18n={i18n}>
+				{/* クライアント境界で i18n を提供 */}
+				<ClientI18nProvider locale={normalized}>
 					<header className="sticky top-0 z-40 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-zinc-900/60 border-b border-zinc-200/60 dark:border-zinc-800/60">
 						<div className="mx-auto max-w-3xl px-6 py-3 flex items-center justify-between">
 							<div className="text-lg font-semibold tracking-tight">WeatherForecastApp</div>
@@ -57,7 +53,7 @@ export default async function LocaleLayout({
 					<footer className="mx-auto max-w-3xl px-6 py-8 text-sm text-zinc-500 dark:text-zinc-400">
 						© WeatherForecastApp · Map tiles: © OpenStreetMap contributors
 					</footer>
-				</I18nextProvider>
+				</ClientI18nProvider>
 			</body>
 		</html>
 	);
