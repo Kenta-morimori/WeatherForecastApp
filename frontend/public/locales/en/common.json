@@ -1,0 +1,17 @@
+{
+	"title_geo": "Search a place & get forecast",
+	"placeholder_search": "Place / Station / Address (e.g., Tokyo Station)",
+	"label_language": "Language",
+	"btn_search": "Search",
+	"hint_start": "Click the map or select a result to show prediction.",
+	"loading_predict": "Loading prediction…",
+	"error_fetch": "Failed to fetch. Please try again later.",
+	"osm_attribution": "Map tiles: © OpenStreetMap contributors (terms & rate limits respected)",
+	"today": "Today (D0)",
+	"tomorrow": "Tomorrow (D1)",
+	"pred_tomorrow": "Tomorrow: mean {{mean}}°C (min {{min}}°C / max {{max}}°C) · precip {{prec}}mm",
+	"toggle_language": "言語",
+	"skip_to_content": "Skip to content",
+	"map_label": "Map",
+	"search_label": "Search a place"
+}
