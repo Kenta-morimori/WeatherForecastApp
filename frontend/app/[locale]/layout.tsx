@@ -7,13 +7,12 @@ export const metadata: Metadata = {
 	description: 'Search a place & get forecast powered by AI',
 };
 
-// ★ params は Promise ではなく同期オブジェクト
 export default function LocaleLayout({
 	children,
 	params,
 }: {
 	children: React.ReactNode;
-	params: { locale: string };
+	params: { locale: string }; // ★ Promise ではない
 }) {
 	const normalized = (params.locale === 'en' ? 'en' : 'ja') as 'ja' | 'en';
 
@@ -23,7 +22,6 @@ export default function LocaleLayout({
 				href="#main"
 				className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:px-3 focus:py-2 focus:rounded-md focus:bg-white focus:text-zinc-900 focus:shadow-lg focus:ring-2 focus:ring-indigo-500 dark:focus:bg-zinc-900 dark:focus:text-white"
 			>
-				{/* サーバー側では t() を使わず固定文言でOK */}
 				Skip to content
 			</a>
 
