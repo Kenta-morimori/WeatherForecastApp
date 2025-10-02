@@ -13,5 +13,17 @@
 	"toggle_language": "言語",
 	"skip_to_content": "Skip to content",
 	"map_label": "Map",
-	"search_label": "Search a place"
+	"search_label": "Search a place",
+
+	"btn_predict": "Predict",
+	"label_lat": "Latitude",
+	"label_lon": "Longitude",
+	"placeholder_lat": "e.g., 35.681",
+	"placeholder_lon": "e.g., 139.767",
+
+	"label_max": "Maximum",
+	"label_min": "Minimum",
+	"label_mean": "Average",
+	"label_precip_prob": "Precipitation prob.",
+	"label_precip": "Precipitation"
 }

@@ -13,5 +13,17 @@
 	"toggle_language": "Language",
 	"skip_to_content": "本文へスキップ",
 	"map_label": "地図",
-	"search_label": "場所を検索"
+	"search_label": "場所を検索",
+
+	"btn_predict": "予測する",
+	"label_lat": "緯度",
+	"label_lon": "経度",
+	"placeholder_lat": "例: 35.681",
+	"placeholder_lon": "例: 139.767",
+
+	"label_max": "最高",
+	"label_min": "最低",
+	"label_mean": "平均",
+	"label_precip_prob": "降水確率",
+	"label_precip": "降水量"
 }
