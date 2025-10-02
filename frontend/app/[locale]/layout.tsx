@@ -1,16 +1,21 @@
 import { ClientI18nProvider } from '@/components/ClientI18nProvider';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import type { Metadata } from 'next';
-import type { LayoutProps } from 'next';
 
 export const metadata: Metadata = {
 	title: 'WeatherForecastApp',
 	description: 'Search a place & get forecast powered by AI',
 };
 
-// ★ Nextのルート型にピッタリ合わせる
-export default function LocaleLayout({ children, params }: LayoutProps<'/[locale]'>) {
-	const normalized = (params.locale === 'en' ? 'en' : 'ja') as 'ja' | 'en';
+type Props = {
+	children: React.ReactNode;
+	// ★ Next.js 15 では Promise
+	params: Promise<{ locale: string }>;
+};
+
+export default async function LocaleLayout({ children, params }: Props) {
+	const { locale } = await params;
+	const normalized = (locale === 'en' ? 'en' : 'ja') as 'ja' | 'en';
 
 	return (
 		<ClientI18nProvider locale={normalized}>
@@ -51,7 +56,7 @@ export default function LocaleLayout({ children, params }: LayoutProps<'/[locale
 	);
 }
 
-// （任意・型補助＆SSG安定化）
+// 任意（SSGの安定化）
 export function generateStaticParams() {
 	return [{ locale: 'ja' }, { locale: 'en' }];
 }
