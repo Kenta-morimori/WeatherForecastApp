@@ -1,19 +1,15 @@
 import { ClientI18nProvider } from '@/components/ClientI18nProvider';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import type { Metadata } from 'next';
+import type { LayoutProps } from 'next';
 
 export const metadata: Metadata = {
 	title: 'WeatherForecastApp',
 	description: 'Search a place & get forecast powered by AI',
 };
 
-export default function LocaleLayout({
-	children,
-	params,
-}: {
-	children: React.ReactNode;
-	params: { locale: string }; // ★ Promise ではない
-}) {
+// ★ Nextのルート型にピッタリ合わせる
+export default function LocaleLayout({ children, params }: LayoutProps<'/[locale]'>) {
 	const normalized = (params.locale === 'en' ? 'en' : 'ja') as 'ja' | 'en';
 
 	return (
@@ -53,4 +49,9 @@ export default function LocaleLayout({
 			</footer>
 		</ClientI18nProvider>
 	);
+}
+
+// （任意・型補助＆SSG安定化）
+export function generateStaticParams() {
+	return [{ locale: 'ja' }, { locale: 'en' }];
 }
