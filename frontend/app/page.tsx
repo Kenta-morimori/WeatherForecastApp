@@ -1,6 +1,6 @@
-// frontend/app/page.tsx
-import { redirect } from 'next/navigation';
+// app/page.tsx
+import { redirect } from "next/navigation";
 
 export default function Page() {
-	redirect('/geo');
+	redirect("/ja");
 }
