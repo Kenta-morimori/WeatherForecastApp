@@ -1,0 +1,29 @@
+{
+	"title_geo": "場所を検索して予測",
+	"placeholder_search": "地名 / 駅名 / 住所（例: 東京駅）",
+	"label_language": "言語",
+	"btn_search": "検索",
+	"hint_start": "地図をクリック、または検索結果を選ぶと予測を表示します。",
+	"loading_predict": "予測取得中…",
+	"error_fetch": "取得に失敗しました。時間をおいて再度お試しください。",
+	"osm_attribution": "地図タイル: © OpenStreetMap contributors（利用規約とレートを遵守）",
+	"today": "今日 (D0)",
+	"tomorrow": "明日 (D1)",
+	"pred_tomorrow": "明日の予測: 平均 {{mean}}℃（最低 {{min}}℃ / 最高 {{max}}℃）・降水 {{prec}}mm",
+	"toggle_language": "Language",
+	"skip_to_content": "本文へスキップ",
+	"map_label": "地図",
+	"search_label": "場所を検索",
+
+	"btn_predict": "予測する",
+	"label_lat": "緯度",
+	"label_lon": "経度",
+	"placeholder_lat": "例: 35.681",
+	"placeholder_lon": "例: 139.767",
+
+	"label_max": "最高",
+	"label_min": "最低",
+	"label_mean": "平均",
+	"label_precip_prob": "降水確率",
+	"label_precip": "降水量"
+}

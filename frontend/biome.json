@@ -1,16 +1,18 @@
 {
 	"$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
-	"formatter": { "enabled": true, "indentWidth": 2, "lineWidth": 100 },
-	"linter": { "enabled": true, "rules": { "recommended": true } },
-	"javascript": { "formatter": { "quoteStyle": "single" } },
+	"linter": { "enabled": true },
+	"formatter": { "enabled": true },
+	"organizeImports": { "enabled": true },
 	"files": {
 		"ignore": [
-			"**/.next/**",
-			"**/node_modules/**",
-			"**/dist/**",
-			"**/build/**",
-			"**/.turbo/**",
-			"**/coverage/**"
+			"node_modules/**",
+			".next/**",
+			"dist/**",
+			"coverage/**",
+			"test-results/**",
+			"playwright-report/**",
+			"blob-report/**",
+			"lighthouse/**"
 		]
 	}
 }

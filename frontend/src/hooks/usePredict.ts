@@ -1,6 +1,10 @@
-'use client';
-import { type PredictInput, type PredictResponse, fetchPredict } from '@/lib/api';
-import { useEffect, useState } from 'react';
+"use client";
+import {
+	type PredictInput,
+	type PredictResponse,
+	fetchPredict,
+} from "@/lib/api";
+import { useEffect, useState } from "react";
 
 export function usePredict(params: PredictInput | null) {
 	const [data, setData] = useState<PredictResponse | null>(null);

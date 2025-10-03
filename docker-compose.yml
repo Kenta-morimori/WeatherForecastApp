@@ -1,0 +1,18 @@
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    env_file: backend/.env
+    environment:
+      # Render 互換にしたい場合などは PORT を明示
+      PORT: "${PORT:-8000}"
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    # 開発時ホットリロードしたいなら以下2行を有効化
+    # volumes:
+    #   - ./backend:/app/backend
+    # command: ["uv", "run", "--project", "backend", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--loop", "uvloop", "--reload"]
