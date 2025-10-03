@@ -11,11 +11,11 @@ from fastapi.routing import APIRoute
 from .api.geocode import router as geocode_router  # /geocode/search, /geocode/reverse
 from .api.routes import router as api_router  # /predict, /forecast
 from .middleware_observability import ObservabilityMiddleware, metrics_dump, wrap_requests
+from .middleware_rate_limit import RateLimitMiddleware  # ← 追加
 
 app = FastAPI(title="WeatherForecastApp API")
 
 # ----- CORS -----
-# 環境変数 ALLOW_ORIGINS をカンマ区切りで指定（例: "http://localhost:3000,https://*.vercel.app"）
 allow_origins = os.getenv("ALLOW_ORIGINS", "http://localhost:3000").split(",")
 app.add_middleware(
     CORSMiddleware,
@@ -25,19 +25,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ----- レート制限（IPベース） -----
+app.add_middleware(RateLimitMiddleware)
+
 # ----- 観測（構造化ログ + 軽量メトリクス） -----
 wrap_requests()
 app.add_middleware(ObservabilityMiddleware)
 
 # ----- ルーター配線 -----
-# ここが無いと /predict や /forecast が 404
 app.include_router(api_router)  # /predict, /forecast
-# geocode は /api 配下に公開（→ /api/geocode/search, /api/geocode/reverse）
-app.include_router(geocode_router, prefix="/api")
+app.include_router(geocode_router, prefix="/api")  # /api/geocode/*
 
 
 # ----- Health / Metrics -----
-# Render のヘルスチェックと合わせて /health を公開（互換で /api/health も残す）
 @app.get("/health")
 def health_root() -> dict:
     return {"status": "ok"}
@@ -59,5 +59,4 @@ async def _log_routes_on_startup() -> None:
     if os.getenv("LOG_ROUTES") == "1":
         for r in app.routes:
             if isinstance(r, APIRoute):
-                # 例: ROUTE ['GET'] /api/geocode/search
                 print("ROUTE", sorted(r.methods), r.path)

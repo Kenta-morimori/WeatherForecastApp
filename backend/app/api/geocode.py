@@ -22,6 +22,13 @@ NOMINATIM_UA = os.getenv(
 NOMINATIM_QPS = float(os.getenv("NOMINATIM_QPS", "1.0"))
 _MIN_INTERVAL = 1.0 / max(0.1, NOMINATIM_QPS)  # 秒
 
+# HTTP リトライ/CB
+HTTP_RETRY_MAX = int(os.getenv("HTTP_RETRY_MAX", "2"))
+HTTP_RETRY_BACKOFF_S = float(os.getenv("HTTP_RETRY_BACKOFF_S", "0.3"))
+CB_OPEN_THRESHOLD = int(os.getenv("CB_OPEN_THRESHOLD", "5"))  # 失敗回数
+CB_OPEN_WINDOW_S = float(os.getenv("CB_OPEN_WINDOW_S", "10.0"))  # 観測窓[s]
+CB_RESET_TIMEOUT_S = float(os.getenv("CB_RESET_TIMEOUT_S", "30.0"))  # Open→Half-Openの待機[s]
+
 # 単純なグローバル・レート制御（プロセス内）
 _last_call_ts = 0.0
 _rate_lock = asyncio.Lock()
@@ -105,6 +112,82 @@ def _format_item(item: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+# ===== サーキットブレーカー =====
+class CircuitBreaker:
+    def __init__(self, threshold: int, window_s: float, reset_timeout_s: float) -> None:
+        self.threshold = threshold
+        self.window_s = window_s
+        self.reset_timeout_s = reset_timeout_s
+        self.fail_ts: List[float] = []
+        self.state: str = "closed"  # closed | open | half-open
+        self.open_since: float = 0.0
+
+    def allow(self) -> bool:
+        now = time.time()
+        if self.state == "open":
+            if now - self.open_since >= self.reset_timeout_s:
+                self.state = "half-open"
+                return True
+            return False
+        return True
+
+    def on_success(self) -> None:
+        self.fail_ts.clear()
+        if self.state in {"half-open", "open"}:
+            self.state = "closed"
+
+    def on_failure(self) -> None:
+        now = time.time()
+        # 窓外の失敗を掃除
+        self.fail_ts = [t for t in self.fail_ts if now - t <= self.window_s]
+        self.fail_ts.append(now)
+        if len(self.fail_ts) >= self.threshold:
+            self.state = "open"
+            self.open_since = now
+
+
+_cb_nominatim = CircuitBreaker(CB_OPEN_THRESHOLD, CB_OPEN_WINDOW_S, CB_RESET_TIMEOUT_S)
+
+
+async def _get_json_with_retry(
+    client: httpx.AsyncClient, url: str, *, params: Dict[str, str], headers: Dict[str, str]
+) -> Any:
+    # サーキットが開いていたら即座に 503
+    if not _cb_nominatim.allow():
+        raise HTTPException(
+            status_code=503, detail="upstream temporarily unavailable (circuit open)"
+        )
+
+    last_exc: Optional[Exception] = None
+    for attempt in range(HTTP_RETRY_MAX + 1):
+        await _respect_rate_limit()
+        try:
+            resp = await client.get(url, params=params, headers=headers)
+            # 429/5xx はリトライ対象
+            if resp.status_code == 429 or 500 <= resp.status_code < 600:
+                last_exc = HTTPException(
+                    status_code=502, detail=f"upstream status {resp.status_code}"
+                )
+                raise last_exc
+            resp.raise_for_status()
+            data = resp.json()
+            _cb_nominatim.on_success()
+            return data
+        except Exception as e:
+            last_exc = e
+            _cb_nominatim.on_failure()
+            if attempt < HTTP_RETRY_MAX:
+                backoff = min(HTTP_RETRY_BACKOFF_S * (2**attempt), 3.0)
+                await asyncio.sleep(backoff)
+                continue
+            break
+
+    # 最終失敗
+    if isinstance(last_exc, HTTPException):
+        raise last_exc
+    raise HTTPException(status_code=502, detail=f"geocoding upstream error: {last_exc}")
+
+
 @router.get("/geocode/search")
 async def geocode_search(
     q: str = Query(..., min_length=2, description="地名／住所／ランドマーク（例: Tokyo Station）"),
@@ -116,6 +199,7 @@ async def geocode_search(
     Nominatim でのフォワードジオコーディング（地名→座標）
     - 1req/sec レート制御
     - in-memory LRU キャッシュ
+    - 429/5xx リトライ + サーキットブレーカー
     """
     key = f"{q}|{limit}|{countrycodes}|{lang}"
     cached = _cache_get(key)
@@ -132,12 +216,11 @@ async def geocode_search(
         params["countrycodes"] = countrycodes
     headers = {"User-Agent": NOMINATIM_UA, "Accept-Language": lang}
 
-    await _respect_rate_limit()
     try:
-        async with httpx.AsyncClient(timeout=10.0, headers=headers) as client:
-            resp = await client.get(f"{NOMINATIM_BASE}/search", params=params)
-            resp.raise_for_status()
-            data = resp.json()
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            data = await _get_json_with_retry(
+                client, f"{NOMINATIM_BASE}/search", params=params, headers=headers
+            )
             if not isinstance(data, list):
                 raise HTTPException(status_code=502, detail="unexpected response from nominatim")
     except HTTPException:
@@ -168,12 +251,11 @@ async def geocode_reverse(
     params = {"lat": str(lat), "lon": str(lon), "format": "jsonv2", "addressdetails": "1"}
     headers = {"User-Agent": NOMINATIM_UA, "Accept-Language": lang}
 
-    await _respect_rate_limit()
     try:
-        async with httpx.AsyncClient(timeout=10.0, headers=headers) as client:
-            resp = await client.get(f"{NOMINATIM_BASE}/reverse", params=params)
-            resp.raise_for_status()
-            data = resp.json()
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            data = await _get_json_with_retry(
+                client, f"{NOMINATIM_BASE}/reverse", params=params, headers=headers
+            )
             if not isinstance(data, dict):
                 raise HTTPException(status_code=502, detail="unexpected response from nominatim")
     except HTTPException:
