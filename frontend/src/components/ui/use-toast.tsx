@@ -1,15 +1,15 @@
-'use client';
-import * as React from 'react';
+"use client";
+import * as React from "react";
 
 type Toast = {
 	id: number;
 	title: string;
 	description?: string;
-	variant?: 'default' | 'destructive';
+	variant?: "default" | "destructive";
 };
 
 type ToastContext = {
-	toast: (t: Omit<Toast, 'id'>) => void;
+	toast: (t: Omit<Toast, "id">) => void;
 };
 
 const ToastCtx = React.createContext<ToastContext | null>(null);
@@ -20,7 +20,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
 	const value = React.useMemo<ToastContext>(
 		() => ({
-			toast: (t: Omit<Toast, 'id'>) => {
+			toast: (t: Omit<Toast, "id">) => {
 				let newId = 0;
 				setSeq((s) => {
 					const next = s + 1;
@@ -43,7 +43,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 					<div
 						key={t.id}
 						className={`min-w-[260px] rounded-2xl px-4 py-3 text-sm shadow-lg ${
-							t.variant === 'destructive' ? 'bg-red-600 text-white' : 'bg-gray-900 text-white'
+							t.variant === "destructive"
+								? "bg-red-600 text-white"
+								: "bg-gray-900 text-white"
 						}`}
 					>
 						<div className="font-semibold">{t.title}</div>

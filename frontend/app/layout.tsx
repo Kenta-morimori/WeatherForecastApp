@@ -1,13 +1,12 @@
-import './globals.css';
-import { ToastProvider } from '@/components/ui/use-toast';
-import type { ReactNode } from 'react';
+// app/layout.tsx
+import "./globals.css";
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default function RootLayout({
+	children,
+}: { children: React.ReactNode }) {
 	return (
-		<html lang="ja">
-			<body>
-				<ToastProvider>{children}</ToastProvider>
-			</body>
+		<html lang="ja" className="h-full">
+			<body className="min-h-screen">{children}</body>
 		</html>
 	);
 }

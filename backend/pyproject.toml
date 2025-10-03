@@ -14,6 +14,12 @@ dependencies = [
   "joblib>=1.5.2",
 ]
 
+[project.optional-dependencies]
+dev = [
+  "mypy",
+  "types-requests",
+]
+
 [tool.uv]
 dev-dependencies = [
   "pre-commit>=3.8.0",

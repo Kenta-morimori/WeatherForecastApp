@@ -13,17 +13,21 @@ export type PredictResponse = {
 	recent_actuals?: SeriesPoint[];
 };
 
-const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? '';
+const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "";
 
 export async function fetchPredict(
 	params: PredictInput,
 	signal?: AbortSignal,
 ): Promise<PredictResponse> {
-	const tz = params.tz ?? 'Asia/Tokyo';
-	const qs = new URLSearchParams({ lat: String(params.lat), lon: String(params.lon), tz });
+	const tz = params.tz ?? "Asia/Tokyo";
+	const qs = new URLSearchParams({
+		lat: String(params.lat),
+		lon: String(params.lon),
+		tz,
+	});
 	const res = await fetch(`${BASE_URL}/predict?${qs.toString()}`, { signal });
 	if (!res.ok) {
-		const text = await res.text().catch(() => '');
+		const text = await res.text().catch(() => "");
 		throw new Error(text || `Request failed: ${res.status}`);
 	}
 	return (await res.json()) as PredictResponse;

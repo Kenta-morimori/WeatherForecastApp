@@ -1,5 +1,5 @@
-'use client';
-import type * as React from 'react';
+"use client";
+import type * as React from "react";
 
 export function Dialog({
 	open,
@@ -17,12 +17,12 @@ export function Dialog({
 	}
 	function onBackdropKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
 		// マウスだけでなくキーボードでも閉じられるように
-		if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
+		if (e.key === "Escape" || e.key === "Enter" || e.key === " ") {
 			onOpenChange(false);
 		}
 	}
 	function onContentKeyDown(e: React.KeyboardEvent<HTMLDialogElement>) {
-		if (e.key === 'Escape') onOpenChange(false);
+		if (e.key === "Escape") onOpenChange(false);
 	}
 
 	return (

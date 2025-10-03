@@ -1,5 +1,5 @@
-'use client';
-import type * as React from 'react';
+"use client";
+import type * as React from "react";
 export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
 	return (
 		<input

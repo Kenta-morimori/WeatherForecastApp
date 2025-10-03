@@ -1,10 +1,30 @@
-/* 最小のリセットだけ。Tailwind を使っているなら @tailwind を入れてください */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Tailwind v4: 単一インポート */
+@import "tailwindcss";
 
+/* 100% height */
 html,
 body,
 #__next {
 	height: 100%;
+}
+
+/* Focus ring (全体規約) */
+:root {
+	--ring: 2px;
+	--ring-color: rgb(99 102 241);
+}
+*:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 var(--ring) var(--ring-color), 0 0 0 calc(var(--ring) + 2px)
+		rgba(255, 255, 255, 0.9);
+}
+
+/* motion reduce */
+@media (prefers-reduced-motion: reduce) {
+	* {
+		animation-duration: 0.001ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.001ms !important;
+		scroll-behavior: auto !important;
+	}
 }
