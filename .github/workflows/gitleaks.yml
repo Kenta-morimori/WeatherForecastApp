@@ -1,24 +1,24 @@
-name: Gitleaks (Secrets Scan)
-
+# .github/workflows/gitleaks.yml
+name: gitleaks
 on:
   pull_request:
-    paths: ['**']
   push:
-    branches: ['main', 'feature/**']
+    branches: [main]
   workflow_dispatch:
 
 jobs:
-  gitleaks:
+  scan:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout (full history for better detection)
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: Run Gitleaks
         uses: gitleaks/gitleaks-action@v2
         env:
-          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }} # 無ければ削除OK（OSSは不要）
-        with:
-          args: detect --redact --verbose
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # org リポジトリの場合のみ必要（個人アカウントは不要）
+          # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+          GITLEAKS_ENABLE_COMMENTS: "true"
+          GITLEAKS_ENABLE_SUMMARY: "true"
+          # 必要ならバージョン固定も可: GITLEAKS_VERSION: "8.24.3"
