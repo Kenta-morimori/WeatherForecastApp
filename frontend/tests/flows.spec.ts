@@ -1,6 +1,5 @@
 import { expect, test } from '@playwright/test';
 
-// 1件ヒット → 自動で doPredict まで
 test('ja: 1 hit -> auto predict', async ({ page }) => {
 	await page.route('**/api/geocode/search**', (route) =>
 		route.fulfill({
@@ -29,11 +28,9 @@ test('ja: 1 hit -> auto predict', async ({ page }) => {
 	await page.goto('/ja');
 	await page.getByLabel('場所を検索').fill('東京駅');
 	await page.getByRole('button', { name: '検索' }).click();
-
 	await expect(page.getByText(/明日の予測|Tomorrow/)).toBeVisible();
 });
 
-// 複数ヒット → セレクトで決定 → 予測
 test('ja: multi hits -> select -> predict', async ({ page }) => {
 	await page.route('**/api/geocode/search**', (route) =>
 		route.fulfill({
@@ -67,9 +64,8 @@ test('ja: multi hits -> select -> predict', async ({ page }) => {
 	await page.getByRole('button', { name: '検索' }).click();
 
 	const list = page.locator('select#geocode-results');
-	await list.waitFor(); // セレクトの出現を待機
-	await list.selectOption({ index: 0 }); // ← これで onChange が必ず発火（Enter/Spaceより堅い）
+	await list.waitFor();
+	await list.selectOption({ index: 0 });
 
-	// 予測結果の表示を待つ
 	await expect(page.getByText(/明日の予測|Tomorrow/)).toBeVisible();
 });
