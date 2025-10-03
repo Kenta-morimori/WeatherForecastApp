@@ -16,6 +16,7 @@ type Props = {
 export default async function LocaleLayout({ children, params }: Props) {
 	const { locale } = await params;
 	const normalized = (locale === 'en' ? 'en' : 'ja') as 'ja' | 'en';
+	const skipText = normalized === 'ja' ? '本文へスキップ' : 'Skip to content'; // ← ローカライズ
 
 	return (
 		<ClientI18nProvider locale={normalized}>
@@ -23,7 +24,7 @@ export default async function LocaleLayout({ children, params }: Props) {
 				href="#main"
 				className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:px-3 focus:py-2 focus:rounded-md focus:bg-white focus:text-zinc-900 focus:shadow-lg focus:ring-2 focus:ring-indigo-500 dark:focus:bg-zinc-900 dark:focus:text-white"
 			>
-				Skip to content
+				{skipText}
 			</a>
 
 			<header className="sticky top-0 z-40 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-zinc-900/60 border-b border-zinc-200/60 dark:border-zinc-800/60">

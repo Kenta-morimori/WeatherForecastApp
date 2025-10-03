@@ -1,0 +1,16 @@
+{
+	"ci": {
+		"collect": {
+			"startServerCommand": "pnpm start -p 3000",
+			"url": ["http://localhost:3000/ja", "http://localhost:3000/en"],
+			"numberOfRuns": 1,
+			"settings": { "preset": "desktop", "onlyCategories": ["accessibility"] }
+		},
+		"assert": {
+			"assertions": {
+				"categories:accessibility": ["error", { "minScore": 0.9 }]
+			}
+		},
+		"upload": { "target": "temporary-public-storage" }
+	}
+}
