@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import i18n from 'i18next';
-import { initReactI18next } from 'react-i18next';
+import i18n from "i18next";
+import { initReactI18next } from "react-i18next";
 
-import enCommon from '../../public/locales/en/common.json';
-import jaCommon from '../../public/locales/ja/common.json';
+import enCommon from "../../public/locales/en/common.json";
+import jaCommon from "../../public/locales/ja/common.json";
 
 const resources = {
 	ja: { common: jaCommon },
@@ -20,11 +20,11 @@ export function getI18n() {
 			.use(initReactI18next)
 			.init({
 				resources,
-				lng: 'ja',
-				fallbackLng: 'ja',
+				lng: "ja",
+				fallbackLng: "ja",
 				interpolation: { escapeValue: false },
-				defaultNS: 'common',
-				ns: ['common'],
+				defaultNS: "common",
+				ns: ["common"],
 				returnEmptyString: false,
 			})
 			.catch(() => {});

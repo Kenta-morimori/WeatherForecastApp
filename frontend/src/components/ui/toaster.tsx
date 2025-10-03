@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { Toaster as SonnerToaster } from 'sonner';
+import { Toaster as SonnerToaster } from "sonner";
 
 export function Toaster() {
 	// お好みで位置や色を調整可能

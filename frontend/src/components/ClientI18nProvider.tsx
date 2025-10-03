@@ -1,14 +1,14 @@
-'use client';
+"use client";
 
-import { getI18n } from '@/lib/i18n';
-import { useEffect } from 'react';
-import { I18nextProvider } from 'react-i18next';
+import { getI18n } from "@/lib/i18n";
+import { useEffect } from "react";
+import { I18nextProvider } from "react-i18next";
 
 export function ClientI18nProvider({
 	locale,
 	children,
 }: {
-	locale: 'ja' | 'en';
+	locale: "ja" | "en";
 	children: React.ReactNode;
 }) {
 	const i18n = getI18n();

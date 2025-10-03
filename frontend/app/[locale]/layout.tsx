@@ -1,10 +1,10 @@
-import { ClientI18nProvider } from '@/components/ClientI18nProvider';
-import { LanguageToggle } from '@/components/LanguageToggle';
-import type { Metadata } from 'next';
+import { ClientI18nProvider } from "@/components/ClientI18nProvider";
+import { LanguageToggle } from "@/components/LanguageToggle";
+import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-	title: 'WeatherForecastApp',
-	description: 'Search a place & get forecast powered by AI',
+	title: "WeatherForecastApp",
+	description: "Search a place & get forecast powered by AI",
 };
 
 type Props = {
@@ -15,8 +15,8 @@ type Props = {
 
 export default async function LocaleLayout({ children, params }: Props) {
 	const { locale } = await params;
-	const normalized = (locale === 'en' ? 'en' : 'ja') as 'ja' | 'en';
-	const skipText = normalized === 'ja' ? '本文へスキップ' : 'Skip to content'; // ← ローカライズ
+	const normalized = (locale === "en" ? "en" : "ja") as "ja" | "en";
+	const skipText = normalized === "ja" ? "本文へスキップ" : "Skip to content"; // ← ローカライズ
 
 	return (
 		<ClientI18nProvider locale={normalized}>
@@ -29,7 +29,9 @@ export default async function LocaleLayout({ children, params }: Props) {
 
 			<header className="sticky top-0 z-40 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-zinc-900/60 border-b border-zinc-200/60 dark:border-zinc-800/60">
 				<div className="mx-auto max-w-3xl px-6 py-3 flex items-center justify-between">
-					<div className="text-lg font-semibold tracking-tight">WeatherForecastApp</div>
+					<div className="text-lg font-semibold tracking-tight">
+						WeatherForecastApp
+					</div>
 					<nav aria-label="Global" className="flex items-center gap-3">
 						<LanguageToggle locale={normalized} />
 					</nav>
@@ -59,5 +61,5 @@ export default async function LocaleLayout({ children, params }: Props) {
 
 // 任意（SSGの安定化）
 export function generateStaticParams() {
-	return [{ locale: 'ja' }, { locale: 'en' }];
+	return [{ locale: "ja" }, { locale: "en" }];
 }

@@ -1,4 +1,4 @@
-import { type NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from "next/server";
 
 function clamp(n: number, min: number, max: number) {
 	return Math.max(min, Math.min(max, n));
@@ -6,9 +6,9 @@ function clamp(n: number, min: number, max: number) {
 
 export async function GET(req: NextRequest) {
 	const { searchParams } = new URL(req.url);
-	const lat = Number(searchParams.get('lat') ?? '0');
-	const lon = Number(searchParams.get('lon') ?? '0');
-	const tz = searchParams.get('tz') ?? 'Asia/Tokyo';
+	const lat = Number(searchParams.get("lat") ?? "0");
+	const lon = Number(searchParams.get("lon") ?? "0");
+	const tz = searchParams.get("tz") ?? "Asia/Tokyo";
 
 	const seed = Math.abs(Math.sin(lat * 12.9898 + lon * 78.233));
 	const rnd = (a: number, b: number) => a + (b - a) * (seed % 1);
